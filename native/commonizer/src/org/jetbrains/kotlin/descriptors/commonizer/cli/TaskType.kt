@@ -40,7 +40,20 @@ internal enum class TaskType(
             NativeDistributionOptionType
         ),
         ::NativeDistributionListTargets
-    );
+    ),
+
+    COMMONIZE(
+        "commonize",
+        "Commonize any platform-specific libraries",
+        listOf(
+            NativeDistributionOptionType,
+            OutputOptionType,
+            NativeTargetsOptionType,
+            LibrariesSetOptionType
+        ),
+        ::Commonize
+    )
+    ;
 
     companion object {
         fun getByAlias(alias: String) = values().firstOrNull { it.alias == alias }

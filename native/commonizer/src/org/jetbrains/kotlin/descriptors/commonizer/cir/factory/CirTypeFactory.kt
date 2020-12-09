@@ -41,6 +41,15 @@ object CirTypeFactory {
                         isMarkedNullable = abbreviation.isMarkedNullable
                     )
                 }
+                // TODO NOW
+                is NotFoundClasses.MockClassDescriptor ->
+                    return createClassType(
+                        classId = classifierDescriptor.internedClassId,
+                        outerType = null,
+                        visibility = classifierDescriptor.visibility,
+                        isMarkedNullable = abbreviation.isMarkedNullable,
+                        arguments = createArguments(abbreviation.arguments, useAbbreviation = true)
+                    )
                 else -> error("Unexpected classifier descriptor type for abbreviation type: ${classifierDescriptor::class.java}, $classifierDescriptor, ${source.abbreviation}")
             }
         }

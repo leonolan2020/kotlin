@@ -48,17 +48,23 @@ fun runCommonization(parameters: Parameters): Result {
 }
 
 private fun mergeAndCommonize(storageManager: StorageManager, parameters: Parameters): CirTreeMergeResult {
+    val sharedTargetDependencies = parameters.sharedTarget to CirProvidedClassifiers.fromModules(storageManager) {
+        parameters.dependeeModulesProvider?.loadModules(emptyList())?.values.orEmpty()
+    }
+
+    val leafTargetDependencies = parameters.targetProviders.associate { targetProvider ->
+        targetProvider.target to CirProvidedClassifiers.fromModules(storageManager) {
+            targetProvider.dependeeModulesProvider?.loadModules(emptyList())?.values.orEmpty()
+        }
+    }
+
     // build merged tree:
     val classifiers = CirKnownClassifiers(
         commonized = CirCommonizedClassifiers.default(),
         forwardDeclarations = CirForwardDeclarations.default(),
-        dependeeLibraries = mapOf(
-            // for now, supply only common dependee libraries (ex: Kotlin stdlib)
-            parameters.sharedTarget to CirProvidedClassifiers.fromModules(storageManager) {
-                parameters.dependeeModulesProvider?.loadModules(emptyList())?.values.orEmpty()
-            }
-        )
+        dependeeLibraries = leafTargetDependencies + sharedTargetDependencies
     )
+
     val mergeResult = CirTreeMerger(storageManager, classifiers, parameters).merge()
 
     // commonize:

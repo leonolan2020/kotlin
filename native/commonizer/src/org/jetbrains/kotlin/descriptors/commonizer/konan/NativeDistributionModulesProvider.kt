@@ -45,14 +45,17 @@ internal class NativeDistributionModulesProvider(
     override fun loadModules(dependencies: Collection<ModuleDescriptor>): Map<String, ModuleDescriptor> {
         check(dependencies.isNotEmpty()) { "At least Kotlin/Native stdlib should be provided" }
 
+        // TODO NOW: use idiomatic function
         val dependenciesMap = mutableMapOf<String, MutableList<ModuleDescriptorImpl>>()
         dependencies.forEach { dependency ->
             val name = dependency.name.strip()
             dependenciesMap.getOrPut(name) { mutableListOf() } += dependency as ModuleDescriptorImpl
         }
 
+        // TODO NOW: is .first okay here?
         val builtIns = dependencies.first().builtIns
 
+        // TODO NOW: Typealias for unique name!
         val platformModulesMap = librariesToCommonize.libraries.associate { library ->
             val name = library.manifestData.uniqueName
             val module = NativeFactories.DefaultDeserializedDescriptorFactory.createDescriptorOptionalBuiltIns(
@@ -74,15 +77,23 @@ internal class NativeDistributionModulesProvider(
 
         platformModulesMap.forEach { (name, module) ->
             val moduleDependencies = mutableListOf<ModuleDescriptorImpl>()
+            // TODO NOW: Why adding the module itself?
             moduleDependencies += module
 
-            librariesToCommonize.getManifest(name).dependencies.forEach {
-                moduleDependencies.addIfNotNull(platformModulesMap[it])
-                moduleDependencies += dependenciesMap[it].orEmpty()
+            librariesToCommonize.getManifest(name).dependencies.forEach { dependencyUniqueName ->
+                val dependencyModuleDescriptors = dependenciesMap[dependencyUniqueName].orEmpty()
+                    .plus(platformModulesMap[dependencyUniqueName])
+                    .filterNotNull()
+
+                if (dependencyModuleDescriptors.isEmpty()) {
+                    // TODO NOW: logger
+                    println("Missing dependency $dependencyUniqueName")
+                }
+
+                moduleDependencies += dependencyModuleDescriptors
             }
 
             moduleDependencies += forwardDeclarations
-
             module.setDependencies(moduleDependencies)
         }
 

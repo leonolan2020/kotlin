@@ -5,6 +5,11 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer.cli
 
+import org.jetbrains.kotlin.descriptors.commonizer.*
+import org.jetbrains.kotlin.descriptors.commonizer.EmptyRepository
+import org.jetbrains.kotlin.descriptors.commonizer.KonanDistribution
+import org.jetbrains.kotlin.descriptors.commonizer.KonanDistributionRepository
+import org.jetbrains.kotlin.descriptors.commonizer.Repository
 import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeDistributionCommonizer
 import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeDistributionCommonizer.StatsType
 import org.jetbrains.kotlin.konan.library.KONAN_DISTRIBUTION_KLIB_DIR
@@ -35,30 +40,54 @@ internal class NativeDistributionListTargets(options: Collection<Option<*>>) : T
     }
 }
 
+internal class Commonize(options: Collection<Option<*>>) : Task(options) {
+    override val category: Category = Category.COMMONIZATION
+
+    override fun execute(logPrefix: String) {
+        val distribution = KonanDistribution(getMandatory<File, NativeDistributionOptionType>())
+        val destination = getMandatory<File, OutputOptionType>()
+        val targets = getMandatory<List<KonanTarget>, NativeTargetsOptionType>()
+        val targetLibraries = getMandatory<List<LibrarySet>, LibrariesSetOptionType>()
+        val statsType = getOptional<StatsType, StatsTypeOptionType> { it == "log-stats" } ?: StatsType.NONE
+
+
+        NativeDistributionCommonizer(
+            konanDistribution = distribution,
+            repository = repository(targets, targetLibraries),
+            dependencies = KonanDistributionRepository(distribution),
+            targets = targets,
+            destination = destination,
+            statsType = statsType,
+            logger = CliLoggerAdapter(2)
+
+        ).run()
+
+        println("DONE!!!")
+    }
+}
+
 internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Task(options) {
     override val category get() = Category.COMMONIZATION
 
     override fun execute(logPrefix: String) {
-        val distribution = getMandatory<File, NativeDistributionOptionType>()
+        val distribution = KonanDistribution(getMandatory<File, NativeDistributionOptionType>())
         val destination = getMandatory<File, OutputOptionType>()
         val targets = getMandatory<List<KonanTarget>, NativeTargetsOptionType>()
-
-        val copyStdlib = getOptional<Boolean, BooleanOptionType> { it == "copy-stdlib" } ?: false
-        val copyEndorsedLibs = getOptional<Boolean, BooleanOptionType> { it == "copy-endorsed-libs" } ?: false
         val statsType = getOptional<StatsType, StatsTypeOptionType> { it == "log-stats" } ?: StatsType.NONE
-
         val targetNames = targets.joinToString { "[${it.name}]" }
-        val descriptionSuffix = estimateLibrariesCount(distribution, targets)?.let { " ($it items)" } ?: ""
-        val description = "${logPrefix}Preparing commonized Kotlin/Native libraries for targets $targetNames$descriptionSuffix"
 
+        val repository = KonanDistributionRepository(distribution)
+
+        val descriptionSuffix = estimateLibrariesCount(repository, targets).let { " ($it items)" }
+        val description = "${logPrefix}Preparing commonized Kotlin/Native libraries for targets $targetNames$descriptionSuffix"
         println(description)
 
         NativeDistributionCommonizer(
-            repository = distribution,
+            konanDistribution = distribution,
+            repository = repository,
+            dependencies = EmptyRepository,
             targets = targets,
             destination = destination,
-            copyStdlib = copyStdlib,
-            copyEndorsedLibs = copyEndorsedLibs,
             statsType = statsType,
             logger = CliLoggerAdapter(2)
         ).run()
@@ -67,15 +96,23 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
     }
 
     companion object {
-        private fun estimateLibrariesCount(distribution: File, targets: List<KonanTarget>): Int? {
-            val targetNames = targets.map { it.name }
-            return distribution.resolve(KONAN_DISTRIBUTION_KLIB_DIR)
-                .resolve(KONAN_DISTRIBUTION_PLATFORM_LIBS_DIR)
-                .listFiles()
-                ?.filter { it.name in targetNames }
-                ?.mapNotNull { it.listFiles() }
-                ?.flatMap { it.toList() }
-                ?.size
+        private fun estimateLibrariesCount(repository: Repository, targets: List<KonanTarget>): Int {
+            return targets.flatMap { repository.getLibraries(LeafTarget(it.name, it)) }.count()
+        }
+    }
+}
+
+
+private fun repository(targets: List<KonanTarget>, librarySets: List<LibrarySet>): Repository {
+    require(targets.size == librarySets.size) { ":( Better error message? " }
+
+    val setsByTarget = librarySets.withIndex().associate { (index, set) ->
+        targets[index] to set
+    }
+
+    return object : Repository {
+        override fun getLibraries(target: LeafTarget): List<File> {
+            return setsByTarget[target.konanTarget]?.files?.toList().orEmpty()
         }
     }
 }
