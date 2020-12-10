@@ -295,7 +295,7 @@ class NativeDistributionCommonizer internal constructor(
             val manifestData = manifestProvider.getManifest(plainName)
             val libraryDestination = librariesDestination.resolve(plainName)
 
-            writeLibrary(metadata, manifestData, libraryDestination)
+            writeLibrary(metadata, manifestData, librariesDestination)
         }
 
         for (absentModuleLocation in absentModuleLocations) {

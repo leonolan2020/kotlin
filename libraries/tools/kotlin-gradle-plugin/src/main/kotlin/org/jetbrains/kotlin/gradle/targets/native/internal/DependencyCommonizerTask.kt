@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.gradle.targets.native.internal
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
@@ -18,7 +19,25 @@ import java.io.File
 
 private typealias TargetName = String
 
-abstract class ConfigurationCommonizerTask : DefaultTask() {
+fun DependencyCommonizerTask.commonOutput(): FileCollection {
+    val collection = project.objects.fileCollection()
+    collection.from(this.outputDirectory.resolve("common"))
+    collection.builtBy(this)
+    return collection
+}
+
+fun DependencyCommonizerTask.output(target: KotlinNativeTarget): FileCollection {
+    return output(target.konanTarget.name)
+}
+
+fun DependencyCommonizerTask.output(target: TargetName): FileCollection {
+    val collection = project.objects.fileCollection()
+    collection.from(this.outputDirectory.resolve("platform/$target"))
+    collection.builtBy(this)
+    return collection
+}
+
+abstract class DependencyCommonizerTask : DefaultTask() {
 
     @get:Internal
     internal val targetLibraries: MutableMap<TargetName, Configuration> = mutableMapOf()
@@ -33,7 +52,9 @@ abstract class ConfigurationCommonizerTask : DefaultTask() {
 
     private fun getOrCreateConfiguration(target: KotlinNativeTarget): Configuration {
         return targetLibraries.getOrPut(target.konanTarget.name) {
-            project.configurations.maybeCreate(lowerCamelCaseName("commonizer", name, target.name))
+            project.configurations.maybeCreate(lowerCamelCaseName("commonizer", name, target.name)).also { configuration ->
+                configuration.isCanBeConsumed = false
+            }
         }
     }
 

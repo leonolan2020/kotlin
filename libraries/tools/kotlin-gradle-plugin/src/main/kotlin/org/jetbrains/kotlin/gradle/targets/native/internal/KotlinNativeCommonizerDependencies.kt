@@ -5,15 +5,8 @@
 
 package org.jetbrains.kotlin.gradle.targets.native.internal
 
-import org.gradle.api.DefaultTask
 import org.gradle.api.Named
 import org.gradle.api.Project
-import org.gradle.api.artifacts.Configuration
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.TaskAction
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import javax.inject.Inject
 
@@ -24,7 +17,7 @@ class CommonizerRequest @Inject constructor(
 
     override fun getName(): String = name
 
-    private val commonizerTask = project.tasks.register(lowerCamelCaseName("commonize", name), ConfigurationCommonizerTask::class.java)
+    private val commonizerTask = project.tasks.register(lowerCamelCaseName("commonize", name), DependencyCommonizerTask::class.java)
 
 }
 
