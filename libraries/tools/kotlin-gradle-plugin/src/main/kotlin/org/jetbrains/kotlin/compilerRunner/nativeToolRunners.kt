@@ -22,7 +22,8 @@ import java.util.*
 private val Project.jvmArgs
     get() = PropertiesProvider(this).nativeJvmArgs?.split("\\s+".toRegex()).orEmpty()
 
-internal val Project.konanHome: String
+// TODO NOW: Make intenral again
+val Project.konanHome: String
     get() = PropertiesProvider(this).nativeHome?.let { file(it).absolutePath }
         ?: NativeCompilerDownloader(project).compilerDirectory.absolutePath
 
@@ -62,8 +63,8 @@ internal abstract class KotlinNativeToolRunner(
         }
 
         listOfNotNull(
-                if (konanHomeRequired) "konan.home" to project.konanHome else null,
-                MessageRenderer.PROPERTY_KEY to MessageRenderer.GRADLE_STYLE.name
+            if (konanHomeRequired) "konan.home" to project.konanHome else null,
+            MessageRenderer.PROPERTY_KEY to MessageRenderer.GRADLE_STYLE.name
         ).toMap()
     }
 
@@ -151,8 +152,7 @@ internal class KotlinNativeKlibRunner(project: Project) : KotlinNativeToolRunner
 
 /** Platform libraries generation tool. Runs the cinterop tool under the hood. */
 internal class KotlinNativeLibraryGenerationRunner(project: Project) :
-    AbstractKotlinNativeCInteropRunner("generatePlatformLibraries", project)
-{
+    AbstractKotlinNativeCInteropRunner("generatePlatformLibraries", project) {
     // The library generator works for a long time so enabling C2 can improve performance.
     override val disableC2: Boolean = false
 }

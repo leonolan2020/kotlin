@@ -61,8 +61,6 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
             logger = CliLoggerAdapter(2)
 
         ).run()
-
-        println("DONE!!!")
     }
 }
 

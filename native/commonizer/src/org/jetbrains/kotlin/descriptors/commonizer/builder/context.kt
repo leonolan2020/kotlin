@@ -131,8 +131,6 @@ class GlobalDeclarationsBuilderComponents(
 }
 
 class TargetDeclarationsBuilderComponents(
-    // TODO 🤢 remove this again!
-    val otherBuilderComponents: List<TargetDeclarationsBuilderComponents>,
     val storageManager: StorageManager,
     val target: Target,
     val builtIns: KotlinBuiltIns,
@@ -156,21 +154,8 @@ class TargetDeclarationsBuilderComponents(
         } else {
             cache.getCachedClassifier(classifierId, index) // first, look up in created descriptors cache
                 ?: lazyClassifierLookupTable().resolveClassOrTypeAlias(classifierId) // then, attempt to load the original classifier
-                ?: findClassOrTypeAliasInOtherBuilderComponents(classifierId)
                 ?: error("Classifier ${classifierId.asString()} not found for $target")
         }
-    }
-
-    private fun findClassOrTypeAliasInOtherBuilderComponents(classifierId: ClassId): ClassifierDescriptorWithTypeParameters? {
-        val results = otherBuilderComponents.map { other -> other.findClassOrTypeAlias(classifierId) }
-        if (results.isEmpty()) {
-            return null
-        }
-        if (results.size == 1) {
-            return results.single()
-        }
-        // TODO: Best hack ever
-        return results.first()
     }
 }
 
@@ -240,8 +225,6 @@ fun CirRootNode.createGlobalBuilderComponents(
         parameters.dependeeModulesProvider?.loadModules(emptyList()).orEmpty()
     }
 
-    val otherBuilderComponents = mutableListOf<TargetDeclarationsBuilderComponents>()
-
     val targetContexts = (0 until dimension).map { index ->
         val isCommon = index == indexOfCommon
 
@@ -279,18 +262,13 @@ fun CirRootNode.createGlobalBuilderComponents(
         }
 
         TargetDeclarationsBuilderComponents(
-            otherBuilderComponents = if (isCommon) otherBuilderComponents else emptyList(),
             storageManager = storageManager,
             target = root.target,
             builtIns = builtIns,
             lazyClassifierLookupTable = lazyModulesLookupTable,
             index = index,
             cache = cache
-        ).also { components ->
-            if (!isCommon) {
-                otherBuilderComponents += components
-            }
-        }
+        )
     }
 
     return GlobalDeclarationsBuilderComponents(storageManager, targetContexts, cache, parameters.statsCollector)
