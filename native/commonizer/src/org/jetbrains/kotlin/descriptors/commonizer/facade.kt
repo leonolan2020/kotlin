@@ -5,6 +5,8 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer
 
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
 import org.jetbrains.kotlin.descriptors.commonizer.builder.DeclarationsBuilderVisitor1
 import org.jetbrains.kotlin.descriptors.commonizer.builder.DeclarationsBuilderVisitor2
 import org.jetbrains.kotlin.descriptors.commonizer.builder.createGlobalBuilderComponents
@@ -28,14 +30,15 @@ fun runCommonization(parameters: Parameters): Result {
     mergedTree.accept(DeclarationsBuilderVisitor1(components), emptyList())
     mergedTree.accept(DeclarationsBuilderVisitor2(components), emptyList())
 
-    val modulesByTargets = LinkedHashMap<Target, Collection<ModuleResult>>() // use linked hash map to preserve order
+    val modulesByTargets = LinkedHashMap<CommonizerTarget, Collection<ModuleResult>>() // use linked hash map to preserve order
     components.targetComponents.forEach { component ->
         val target = component.target
         check(target !in modulesByTargets)
 
-        val commonizedModules: List<ModuleResult.Commonized> = components.cache.getAllModules(component.index).map(ModuleResult::Commonized)
+        val commonizedModules: List<ModuleResult.Commonized> = components.cache.getAllModules(component.index)
+            .map(ModuleResult::Commonized)
 
-        val absentModules: List<ModuleResult.Absent> = if (target is LeafTarget)
+        val absentModules: List<ModuleResult.Absent> = if (target is LeafCommonizerTarget)
             mergeResult.absentModuleInfos.getValue(target).map { ModuleResult.Absent(it.originalLocation) }
         else emptyList()
 

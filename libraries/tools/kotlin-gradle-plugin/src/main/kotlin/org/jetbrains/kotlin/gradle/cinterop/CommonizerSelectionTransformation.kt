@@ -12,49 +12,35 @@ import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
-import org.jetbrains.kotlin.konan.target.KonanTarget
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout.getTargetDirectory
+import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout.stableDirectoryName
+import java.io.File
 import java.io.Serializable
 
 abstract class CommonizerSelectionTransformation : TransformAction<CommonizerSelectionTransformation.Parameters> {
     open class Parameters : TransformParameters, Serializable {
         @Input
-        var targets: Set<KonanTarget> = emptySet()
+        var target: CommonizerTarget? = null
     }
 
     @get:InputArtifact
     abstract val commonizerOutput: Provider<FileSystemLocation>
 
     override fun transform(output: TransformOutputs) {
-        val targets = parameters.targets
-        println("Selecting commonizer output for $targets")
+        val target = parameters.target ?: error("Missing target")
+
         val commonizerOutputDirectory = commonizerOutput.get().asFile
         check(commonizerOutputDirectory.isDirectory)
 
-        if (targets.size > 1) {
-            val commonDiretory = commonizerOutputDirectory.resolve("common")
-            check(commonDiretory.isDirectory) { "Missing common directory " }
+        val targetDirectory = getTargetDirectory(commonizerOutputDirectory, target)
+        check(targetDirectory.isDirectory) { "Missing commonizer target $target" }
 
-            for (commonLibrary in commonDiretory.listFiles().orEmpty()) {
-                val directory = output.dir("common/${commonLibrary.name}")
-                commonLibrary.copyRecursively(directory)
-                println("Selected common ${directory.path}")
-            }
-        }
-
-        if (targets.size == 1) {
-            val target = targets.single()
-            val platformDirectory = commonizerOutputDirectory.resolve("platform")
-            check(platformDirectory.isDirectory) { "Missing platform directory" }
-
-            val targetDirectory = platformDirectory.resolve(target.name)
-            check(targetDirectory.isDirectory) { "Unsupported platform ${target.name}" }
-
-            for (targetLibrary in targetDirectory.listFiles().orEmpty()) {
-                val directory = output.dir("${target.name}/${targetLibrary.name}")
-                targetDirectory.listFiles().orEmpty().forEach { targetFile ->
-                    targetFile.copyRecursively(directory)
-                }
-            }
+        targetDirectory.listFiles().orEmpty().forEach { targetLibraryDirectory ->
+            check(targetLibraryDirectory.isDirectory)
+            val outputDirectory = output.dir(File(stableDirectoryName(target)).resolve(targetLibraryDirectory.name))
+            targetLibraryDirectory.copyRecursively(outputDirectory)
         }
     }
+
 }

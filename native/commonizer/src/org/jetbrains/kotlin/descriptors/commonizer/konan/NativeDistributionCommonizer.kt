@@ -9,10 +9,13 @@ import org.jetbrains.kotlin.backend.common.serialization.metadata.KlibMetadataMo
 import org.jetbrains.kotlin.backend.common.serialization.metadata.KlibMetadataVersion
 import org.jetbrains.kotlin.backend.common.serialization.metadata.metadataVersion
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
+import org.jetbrains.kotlin.commonizer.api.CommonizerOutputLayout
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.SharedCommonizerTarget
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.commonizer.*
-import org.jetbrains.kotlin.descriptors.commonizer.Target
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
 import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeDistributionCommonizer.StatsType.*
 import org.jetbrains.kotlin.descriptors.commonizer.stats.AggregatedStatsCollector
 import org.jetbrains.kotlin.descriptors.commonizer.stats.FileStatsOutput
@@ -41,6 +44,7 @@ class NativeDistributionCommonizer internal constructor(
     private val dependencies: Repository,
     private val targets: List<KonanTarget>,
     private val destination: File,
+    private val destinationLayout: CommonizerOutputLayout,
     private val statsType: StatsType,
     private val logger: Logger
 ) {
@@ -87,7 +91,7 @@ class NativeDistributionCommonizer internal constructor(
         val stdlib = NativeLibrary(loadLibrary(konanDistribution.stdlib))
 
         val librariesByTargets = targets.associate { target ->
-            val leafTarget = LeafTarget(target.name, target)
+            val leafTarget = LeafCommonizerTarget(target)
 
             val platformLibs = repository.getLibraries(leafTarget)
 
@@ -210,11 +214,11 @@ class NativeDistributionCommonizer internal constructor(
                     val manifestProvider: NativeManifestDataProvider
                     val starredTarget: String?
                     when (target) {
-                        is LeafTarget -> {
+                        is LeafCommonizerTarget -> {
                             manifestProvider = originalLibraries.librariesByTargets.getValue(target)
                             starredTarget = target.name
                         }
-                        is SharedTarget -> {
+                        is SharedCommonizerTarget -> {
                             manifestProvider = CommonNativeManifestDataProvider(originalLibraries.librariesByTargets.values)
                             starredTarget = null
                         }
@@ -257,7 +261,7 @@ class NativeDistributionCommonizer internal constructor(
     }
 
 
-    private fun copyTargetAsIs(leafTarget: LeafTarget, librariesCount: Int) {
+    private fun copyTargetAsIs(leafTarget: LeafCommonizerTarget, librariesCount: Int) {
         /*
         val librariesDestination = leafTarget.librariesDestination
         librariesDestination.mkdirs() // always create an empty directory even if there is nothing to copy
@@ -272,14 +276,14 @@ class NativeDistributionCommonizer internal constructor(
     }
 
     private fun serializeTarget(
-        target: Target,
+        target: CommonizerTarget,
         targetName: String,
         newModules: Collection<ModuleDescriptor>,
         absentModuleLocations: List<File>,
         manifestProvider: NativeManifestDataProvider,
         serializer: KlibMetadataMonolithicSerializer
     ) {
-        val librariesDestination = target.librariesDestination
+        val librariesDestination = destinationLayout.getTargetDirectory(destination, target)
         librariesDestination.mkdirs() // always create an empty directory even if there is nothing to copy
 
         for (newModule in newModules) {
@@ -324,12 +328,6 @@ class NativeDistributionCommonizer internal constructor(
         library.commit()
     }
 
-
-    private val Target.librariesDestination: File
-        get() = when (this) {
-            is LeafTarget -> destination.resolve(KONAN_DISTRIBUTION_PLATFORM_LIBS_DIR).resolve(name)
-            is SharedTarget -> destination.resolve(KONAN_DISTRIBUTION_COMMON_LIBS_DIR)
-        }
 
     private companion object {
         fun shouldBeSerialized(libraryName: Name) =

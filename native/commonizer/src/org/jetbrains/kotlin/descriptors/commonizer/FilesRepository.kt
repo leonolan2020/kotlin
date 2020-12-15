@@ -5,6 +5,8 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer
 
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
 import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeLibrary
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
@@ -19,10 +21,10 @@ internal class FilesRepository(
     private val libraryLoader: NativeLibraryLoader
 ) : Repository {
 
-    private val librariesByTarget: Map<Target, Set<NativeLibrary>> by lazy {
+    private val librariesByTarget: Map<CommonizerTarget, Set<NativeLibrary>> by lazy {
         libraryFiles
             .map(libraryLoader::invoke)
-            .groupBy { library -> Target(library.manifestData.nativeTargets.map(::konanTargetOrThrow)) }
+            .groupBy { library -> CommonizerTarget(library.manifestData.nativeTargets.map(::konanTargetOrThrow)) }
             .mapValues { (_, list) -> list.toSet() }
     }
 
@@ -30,7 +32,7 @@ internal class FilesRepository(
         return librariesByTarget.values.flatten().toSet()
     }
 
-    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+    override fun getLibraries(target: LeafCommonizerTarget): Set<NativeLibrary> {
         return librariesByTarget[target].orEmpty()
     }
 }

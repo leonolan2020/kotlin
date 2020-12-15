@@ -5,6 +5,9 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer.cli
 
+import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.NativeDistributionTargetDestinationLayout
 import org.jetbrains.kotlin.descriptors.commonizer.*
 import org.jetbrains.kotlin.descriptors.commonizer.EmptyRepository
 import org.jetbrains.kotlin.descriptors.commonizer.KonanDistribution
@@ -59,6 +62,7 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
             dependencies = KonanDistributionRepository(distribution, targets.toSet(), libraryLoader),
             targets = targets,
             destination = destination,
+            destinationLayout = HierarchicalDistributionTargetDestinationLayout,
             statsType = statsType,
             logger = CliLoggerAdapter(2)
 
@@ -89,6 +93,7 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
             dependencies = EmptyRepository,
             targets = targets,
             destination = destination,
+            destinationLayout = NativeDistributionTargetDestinationLayout,
             statsType = statsType,
             logger = logger,
         ).run()
@@ -98,7 +103,7 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
 
     companion object {
         private fun estimateLibrariesCount(repository: Repository, targets: List<KonanTarget>): Int {
-            return targets.flatMap { repository.getLibraries(LeafTarget(it.name, it)) }.count()
+            return targets.flatMap { repository.getLibraries(LeafCommonizerTarget(it)) }.count()
         }
     }
 }

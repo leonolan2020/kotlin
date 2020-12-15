@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.commonizer.Parameters
-import org.jetbrains.kotlin.descriptors.commonizer.Target
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
 import org.jetbrains.kotlin.descriptors.commonizer.mergedtree.CirNode.Companion.dimension
 import org.jetbrains.kotlin.descriptors.commonizer.mergedtree.CirNode.Companion.indexOfCommon
 import org.jetbrains.kotlin.descriptors.commonizer.mergedtree.CirRootNode
@@ -132,7 +132,7 @@ class GlobalDeclarationsBuilderComponents(
 
 class TargetDeclarationsBuilderComponents(
     val storageManager: StorageManager,
-    val target: Target,
+    val target: CommonizerTarget,
     val builtIns: KotlinBuiltIns,
     val lazyClassifierLookupTable: NotNullLazyValue<LazyClassifierLookupTable>,
     val index: Int,

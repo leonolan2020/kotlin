@@ -122,8 +122,8 @@ abstract class AbstractKotlinCompilation<T : KotlinCommonOptions>(
 
                 // Use `forced = false` since `api`, `implementation`, and `compileOnly` may be missing in some cases like
                 // old Java & Android projects:
-                addExtendsFromRelation(apiConfigurationName, sourceSet.apiConfigurationName, forced = false)
-                addExtendsFromRelation(implementationConfigurationName, sourceSet.implementationConfigurationName, forced = false)
+                addExtendsFromRelation(apiConfigurationName, sourceSet.apiConfigurationName, forced = true)
+                addExtendsFromRelation(implementationConfigurationName, sourceSet.implementationConfigurationName, forced = true)
                 addExtendsFromRelation(compileOnlyConfigurationName, sourceSet.compileOnlyConfigurationName, forced = false)
 
                 if (this@AbstractKotlinCompilation is KotlinCompilationToRunnableFiles<*>) {

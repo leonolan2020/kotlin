@@ -5,14 +5,13 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer
 
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
 import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeLibrary
-import org.jetbrains.kotlin.konan.library.*
 import org.jetbrains.kotlin.konan.target.KonanTarget
-import java.io.File
 
 internal interface Repository {
     fun getLibraries(): Set<NativeLibrary>
-    fun getLibraries(target: LeafTarget): Set<NativeLibrary>
+    fun getLibraries(target: LeafCommonizerTarget): Set<NativeLibrary>
 }
 
 internal operator fun Repository.plus(other: Repository): Repository {
@@ -28,8 +27,8 @@ internal class KonanDistributionRepository(
     private val libraryLoader: NativeLibraryLoader,
 ) : Repository {
 
-    private val librariesByTarget: Map<LeafTarget, Lazy<Set<NativeLibrary>>> = run {
-        targets.map(::LeafTarget).associateWith { target ->
+    private val librariesByTarget: Map<LeafCommonizerTarget, Lazy<Set<NativeLibrary>>> = run {
+        targets.map(::LeafCommonizerTarget).associateWith { target ->
             lazy {
                 konanDistribution.platformLibsDir
                     .resolve(target.name)
@@ -46,7 +45,7 @@ internal class KonanDistributionRepository(
         return librariesByTarget.values.map { it.value }.flatten().toSet()
     }
 
-    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+    override fun getLibraries(target: LeafCommonizerTarget): Set<NativeLibrary> {
         return librariesByTarget[target]?.value ?: error("Missing target $target")
     }
 }
@@ -56,13 +55,13 @@ private class CompositeRepository(val repositories: Iterable<Repository>) : Repo
         return repositories.map { it.getLibraries() }.flatten().toSet()
     }
 
-    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+    override fun getLibraries(target: LeafCommonizerTarget): Set<NativeLibrary> {
         return repositories.map { it.getLibraries(target) }.flatten().toSet()
     }
 }
 
 internal object EmptyRepository : Repository {
-    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+    override fun getLibraries(target: LeafCommonizerTarget): Set<NativeLibrary> {
         return emptySet()
     }
 
