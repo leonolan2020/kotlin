@@ -47,14 +47,16 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
         val distribution = KonanDistribution(getMandatory<File, NativeDistributionOptionType>())
         val destination = getMandatory<File, OutputOptionType>()
         val targets = getMandatory<List<KonanTarget>, NativeTargetsOptionType>()
-        val targetLibraries = getMandatory<List<LibrarySet>, LibrariesSetOptionType>()
+        val targetLibraries = getMandatory<List<File>, LibrariesSetOptionType>()
         val statsType = getOptional<StatsType, StatsTypeOptionType> { it == "log-stats" } ?: StatsType.NONE
 
+        val logger = CliLoggerAdapter(2)
+        val libraryLoader = DefaultNativeLibraryLoader(logger)
 
         NativeDistributionCommonizer(
             konanDistribution = distribution,
-            repository = repository(targets, targetLibraries),
-            dependencies = KonanDistributionRepository(distribution),
+            repository = FilesRepository(targetLibraries.toSet(), libraryLoader),
+            dependencies = KonanDistributionRepository(distribution, targets.toSet(), libraryLoader),
             targets = targets,
             destination = destination,
             statsType = statsType,
@@ -74,7 +76,8 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
         val statsType = getOptional<StatsType, StatsTypeOptionType> { it == "log-stats" } ?: StatsType.NONE
         val targetNames = targets.joinToString { "[${it.name}]" }
 
-        val repository = KonanDistributionRepository(distribution)
+        val logger = CliLoggerAdapter(2)
+        val repository = KonanDistributionRepository(distribution, targets.toSet(), DefaultNativeLibraryLoader(logger))
 
         val descriptionSuffix = estimateLibrariesCount(repository, targets).let { " ($it items)" }
         val description = "${logPrefix}Preparing commonized Kotlin/Native libraries for targets $targetNames$descriptionSuffix"
@@ -87,7 +90,7 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
             targets = targets,
             destination = destination,
             statsType = statsType,
-            logger = CliLoggerAdapter(2)
+            logger = logger,
         ).run()
 
         println("$description: Done")
@@ -96,21 +99,6 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
     companion object {
         private fun estimateLibrariesCount(repository: Repository, targets: List<KonanTarget>): Int {
             return targets.flatMap { repository.getLibraries(LeafTarget(it.name, it)) }.count()
-        }
-    }
-}
-
-
-private fun repository(targets: List<KonanTarget>, librarySets: List<LibrarySet>): Repository {
-    require(targets.size == librarySets.size) { ":( Better error message? " }
-
-    val setsByTarget = librarySets.withIndex().associate { (index, set) ->
-        targets[index] to set
-    }
-
-    return object : Repository {
-        override fun getLibraries(target: LeafTarget): List<File> {
-            return setsByTarget[target.konanTarget]?.files?.toList().orEmpty()
         }
     }
 }

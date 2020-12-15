@@ -62,7 +62,7 @@ abstract class CommonizerTransformation : TransformAction<CommonizerTransformati
             add("-distribution-path"); add(konanHome.absolutePath)
             add("-targets"); add(parameters.targets.joinToString(","))
             add("-output-path"); add(output.absolutePath)
-            add("-target-libraries"); add(klibs.reversed().joinToString(";") { it.absolutePath })
+            add("-target-libraries"); add(klibs.joinToString(";") { it.absolutePath })
         }
     }
 }

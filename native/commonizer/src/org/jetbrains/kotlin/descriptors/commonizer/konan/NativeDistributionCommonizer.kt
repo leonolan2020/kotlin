@@ -90,13 +90,12 @@ class NativeDistributionCommonizer internal constructor(
             val leafTarget = LeafTarget(target.name, target)
 
             val platformLibs = repository.getLibraries(leafTarget)
-                .map(::loadLibrary)
-                .map(::NativeLibrary)
+
 
             if (platformLibs.isEmpty())
                 logger.warning("No platform libraries found for target $target. This target will be excluded from commonization.")
 
-            leafTarget to NativeLibrariesToCommonize(platformLibs)
+            leafTarget to NativeLibrariesToCommonize(platformLibs.toList())
         }
 
         logProgress("Read lazy (uninitialized) libraries")
@@ -151,7 +150,7 @@ class NativeDistributionCommonizer internal constructor(
                     val modulesProvider = NativeDistributionModulesProvider(storageManager, librariesToCommonize)
 
                     val dependencyModuleProvider = NativeDistributionModulesProvider(
-                        storageManager, NativeLibrariesToCommonize.create(dependencies.getLibraries(target).map(::loadLibrary))
+                        storageManager, NativeLibrariesToCommonize(dependencies.getLibraries(target).toList())
                     )
 
                     addTarget(

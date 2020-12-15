@@ -7,17 +7,13 @@ package org.jetbrains.kotlin.descriptors.commonizer.cli
 
 import java.io.File
 
-data class LibrarySet(val files: Set<File>)
 
-internal object LibrariesSetOptionType : OptionType<List<LibrarySet>>(
+internal object LibrariesSetOptionType : OptionType<List<File>>(
     mandatory = true,
     alias = "target-libraries",
     description = "; and , separated (TODO NOW)"
 ) {
-    override fun parse(rawValue: String, onError: (reason: String) -> Nothing): Option<List<LibrarySet>> {
-        val sets = rawValue.split(";").map { filesForTarget ->
-            LibrarySet(filesForTarget.split(",").map(::File).toSet())
-        }
-        return Option(this, sets)
+    override fun parse(rawValue: String, onError: (reason: String) -> Nothing): Option<List<File>> {
+        return Option(this, rawValue.split(";").map(::File))
     }
 }

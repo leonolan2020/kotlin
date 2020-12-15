@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.descriptors.commonizer.cli
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.konan.target.KonanTarget.Companion.predefinedTargets
 
+
+
 internal object NativeTargetsOptionType : OptionType<List<KonanTarget>>("targets", "Comma-separated list of hardware targets") {
     override fun parse(rawValue: String, onError: (reason: String) -> Nothing): Option<List<KonanTarget>> {
         val targetNames = rawValue.split(',')

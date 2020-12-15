@@ -5,12 +5,14 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer
 
+import org.jetbrains.kotlin.descriptors.commonizer.konan.NativeLibrary
 import org.jetbrains.kotlin.konan.library.*
+import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 
-
 internal interface Repository {
-    fun getLibraries(target: LeafTarget): List<File>
+    fun getLibraries(): Set<NativeLibrary>
+    fun getLibraries(target: LeafTarget): Set<NativeLibrary>
 }
 
 internal operator fun Repository.plus(other: Repository): Repository {
@@ -20,25 +22,52 @@ internal operator fun Repository.plus(other: Repository): Repository {
     return CompositeRepository(listOf(this, other))
 }
 
-internal class KonanDistributionRepository(private val konanDistribution: KonanDistribution) : Repository {
-    override fun getLibraries(target: LeafTarget): List<File> {
-        return konanDistribution.platformLibsDir
-            .resolve(target.name)
-            .takeIf { it.isDirectory }
-            ?.listFiles()
-            .orEmpty().toList()
+internal class KonanDistributionRepository(
+    private val konanDistribution: KonanDistribution,
+    private val targets: Set<KonanTarget>,
+    private val libraryLoader: NativeLibraryLoader,
+) : Repository {
+
+    private val librariesByTarget: Map<LeafTarget, Lazy<Set<NativeLibrary>>> = run {
+        targets.map(::LeafTarget).associateWith { target ->
+            lazy {
+                konanDistribution.platformLibsDir
+                    .resolve(target.name)
+                    .takeIf { it.isDirectory }
+                    ?.listFiles()
+                    .orEmpty().toList()
+                    .map { libraryLoader(it) }
+                    .toSet()
+            }
+        }
+    }
+
+    override fun getLibraries(): Set<NativeLibrary> {
+        return librariesByTarget.values.map { it.value }.flatten().toSet()
+    }
+
+    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+        return librariesByTarget[target]?.value ?: error("Missing target $target")
     }
 }
 
 private class CompositeRepository(val repositories: Iterable<Repository>) : Repository {
-    override fun getLibraries(target: LeafTarget): List<File> {
-        return repositories.flatMap { it.getLibraries(target) }.distinct()
+    override fun getLibraries(): Set<NativeLibrary> {
+        return repositories.map { it.getLibraries() }.flatten().toSet()
+    }
+
+    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+        return repositories.map { it.getLibraries(target) }.flatten().toSet()
     }
 }
 
 internal object EmptyRepository : Repository {
-    override fun getLibraries(target: LeafTarget): List<File> {
-        return emptyList()
+    override fun getLibraries(target: LeafTarget): Set<NativeLibrary> {
+        return emptySet()
+    }
+
+    override fun getLibraries(): Set<NativeLibrary> {
+        return emptySet()
     }
 }
 
