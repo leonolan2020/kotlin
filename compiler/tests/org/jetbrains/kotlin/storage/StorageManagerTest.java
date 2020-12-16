@@ -163,7 +163,8 @@ public class StorageManagerTest extends TestCase {
             fail();
         }
         catch (AssertionError e) {
-            assertTrue(e.getMessage().startsWith("Recursion detected on input: !!!"));
+            String message = e.getMessage();
+            assertTrue("Expected message starting with \"Recursion detected\", got: " + message, message.startsWith("Recursion detected on input: !!!"));
         }
     }
 
