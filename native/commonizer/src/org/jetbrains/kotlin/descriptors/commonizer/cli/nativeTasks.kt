@@ -5,9 +5,9 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer.cli
 
-import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout
+import org.jetbrains.kotlin.commonizer.api.HierarchicalCommonizerOutputLayout
 import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.NativeDistributionTargetDestinationLayout
+import org.jetbrains.kotlin.commonizer.api.NativeDistributionCommonizerOutputLayout
 import org.jetbrains.kotlin.descriptors.commonizer.*
 import org.jetbrains.kotlin.descriptors.commonizer.EmptyRepository
 import org.jetbrains.kotlin.descriptors.commonizer.KonanDistribution
@@ -62,7 +62,7 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
             dependencies = KonanDistributionRepository(distribution, targets.toSet(), libraryLoader),
             targets = targets,
             destination = destination,
-            destinationLayout = HierarchicalDistributionTargetDestinationLayout,
+            destinationLayout = HierarchicalCommonizerOutputLayout,
             statsType = statsType,
             logger = CliLoggerAdapter(2)
 
@@ -93,7 +93,7 @@ internal class NativeDistributionCommonize(options: Collection<Option<*>>) : Tas
             dependencies = EmptyRepository,
             targets = targets,
             destination = destination,
-            destinationLayout = NativeDistributionTargetDestinationLayout,
+            destinationLayout = NativeDistributionCommonizerOutputLayout,
             statsType = statsType,
             logger = logger,
         ).run()

@@ -34,3 +34,17 @@ public fun CommonizerTarget(konanTargets: Iterable<KonanTarget>): CommonizerTarg
 public fun CommonizerTarget(vararg konanTargets: KonanTarget): CommonizerTarget {
     return CommonizerTarget(konanTargets.toList())
 }
+
+public val CommonizerTarget.identityString: String
+    get() = when (this) {
+        is LeafCommonizerTarget -> name
+        is SharedCommonizerTarget -> identityString
+    }
+
+private val SharedCommonizerTarget.identityString: String
+    get() {
+        val segments = targets.map(CommonizerTarget::identityString).sorted()
+        return segments.joinToString(
+            separator = ", ", prefix = "[", postfix = "]"
+        )
+    }

@@ -13,8 +13,9 @@ import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout.getTargetDirectory
-import org.jetbrains.kotlin.commonizer.api.HierarchicalDistributionTargetDestinationLayout.stableDirectoryName
+import org.jetbrains.kotlin.commonizer.api.HierarchicalCommonizerOutputLayout.getTargetDirectory
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.identityString
 import java.io.File
 import java.io.Serializable
 
@@ -38,9 +39,8 @@ abstract class CommonizerSelectionTransformation : TransformAction<CommonizerSel
 
         targetDirectory.listFiles().orEmpty().forEach { targetLibraryDirectory ->
             check(targetLibraryDirectory.isDirectory)
-            val outputDirectory = output.dir(File(stableDirectoryName(target)).resolve(targetLibraryDirectory.name))
+            val outputDirectory = output.dir(File(target.identityString).resolve(targetLibraryDirectory.name))
             targetLibraryDirectory.copyRecursively(outputDirectory)
         }
     }
-
 }

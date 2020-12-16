@@ -14,7 +14,7 @@ public fun interface CommonizerOutputLayout {
     public fun getTargetDirectory(root: File, target: CommonizerTarget): File
 }
 
-public object NativeDistributionTargetDestinationLayout : CommonizerOutputLayout {
+public object NativeDistributionCommonizerOutputLayout : CommonizerOutputLayout {
     override fun getTargetDirectory(root: File, target: CommonizerTarget): File {
         return when (target) {
             is LeafCommonizerTarget -> root.resolve(KONAN_DISTRIBUTION_PLATFORM_LIBS_DIR).resolve(target.name)
@@ -23,25 +23,9 @@ public object NativeDistributionTargetDestinationLayout : CommonizerOutputLayout
     }
 }
 
-// TODO NOW: Test
-public object HierarchicalDistributionTargetDestinationLayout : CommonizerOutputLayout {
-
-    private fun stableDirectoryName(target: SharedCommonizerTarget): String {
-        val segments = target.targets.map(::stableDirectoryName).sorted()
-        return segments.joinToString(
-            separator = ", ", prefix = "[", postfix = "]"
-        )
-    }
-
-    public fun stableDirectoryName(target: CommonizerTarget): String {
-        return when (target) {
-            is LeafCommonizerTarget -> target.name
-            is SharedCommonizerTarget -> stableDirectoryName(target)
-        }
-    }
-
+public object HierarchicalCommonizerOutputLayout : CommonizerOutputLayout {
     override fun getTargetDirectory(root: File, target: CommonizerTarget): File {
-        return root.resolve(stableDirectoryName(target))
+        return root.resolve(target.identityString)
     }
 }
 

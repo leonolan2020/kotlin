@@ -14,6 +14,8 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.identityString
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 import java.io.Serializable
@@ -68,3 +70,23 @@ abstract class CommonizerTransformation : TransformAction<CommonizerTransformati
 }
 
 
+abstract class PlatformInteropKlibSelectionTransformation : TransformAction<PlatformInteropKlibSelectionTransformation.Parameters> {
+    open class Parameters : TransformParameters, Serializable {
+        @Input
+        var target: LeafCommonizerTarget? = null
+    }
+
+    @get:Classpath
+    @get:InputArtifact
+    abstract val interopBundle: Provider<FileSystemLocation>
+
+    override fun transform(outputs: TransformOutputs) {
+        val target = parameters.target ?: error("Missing target")
+        val interopBundleFile = interopBundle.get().asFile
+        val platformLibraryFiles = interopBundleFile.resolve(target.identityString)
+        for (platformLibraryFile in platformLibraryFiles.listFiles().orEmpty()) {
+            val outputFile = outputs.file(File(target.identityString).resolve(platformLibraryFile.name))
+            platformLibraryFile.copyTo(outputFile)
+        }
+    }
+}
