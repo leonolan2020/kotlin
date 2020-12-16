@@ -3,7 +3,7 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.gradle.cinterop
+package org.jetbrains.kotlin.gradle.ib
 
 import org.gradle.api.artifacts.transform.InputArtifact
 import org.gradle.api.artifacts.transform.TransformAction
@@ -14,12 +14,11 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.HierarchicalCommonizerOutputLayout.getTargetDirectory
-import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.identityString
 import java.io.File
 import java.io.Serializable
 
-abstract class CommonizerSelectionTransformation : TransformAction<CommonizerSelectionTransformation.Parameters> {
+abstract class CommonizerOutputSelectionTransformation : TransformAction<CommonizerOutputSelectionTransformation.Parameters> {
     open class Parameters : TransformParameters, Serializable {
         @Input
         var target: CommonizerTarget? = null
