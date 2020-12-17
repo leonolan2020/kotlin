@@ -14,6 +14,7 @@ dependencies {
     api(kotlinStdlib())
 
     implementation(project(":native:kotlin-native-utils"))
+    testCompile(project(":kotlin-test::kotlin-test-junit"))
     testImplementation(commonDep("junit:junit"))
     testImplementation(projectTests(":compiler:tests-common"))
 }

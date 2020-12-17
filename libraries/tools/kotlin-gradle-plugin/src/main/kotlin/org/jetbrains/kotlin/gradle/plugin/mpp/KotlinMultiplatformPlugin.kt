@@ -39,7 +39,6 @@ import org.jetbrains.kotlin.gradle.plugin.statistics.KotlinBuildStatsService
 import org.jetbrains.kotlin.gradle.scripting.internal.ScriptingGradleSubplugin
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTargetPreset
 import org.jetbrains.kotlin.gradle.targets.metadata.isKotlinGranularMetadataEnabled
-import org.jetbrains.kotlin.gradle.targets.native.internal.CommonizerRequest
 import org.jetbrains.kotlin.gradle.tasks.locateTask
 import org.jetbrains.kotlin.gradle.tasks.registerTask
 import org.jetbrains.kotlin.gradle.utils.*
@@ -79,7 +78,6 @@ class KotlinMultiplatformPlugin(
         val targetsContainer = project.container(KotlinTarget::class.java)
         val kotlinMultiplatformExtension = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
         val targetsFromPreset = TargetFromPresetExtension(kotlinMultiplatformExtension)
-        val commonizerContainer = project.container(CommonizerRequest::class.java) { name -> CommonizerRequest(project, name) }
 
         kotlinMultiplatformExtension.apply {
             DslObject(targetsContainer).addConvention("fromPreset", targetsFromPreset)
@@ -89,8 +87,6 @@ class KotlinMultiplatformPlugin(
 
             presets = project.container(KotlinTargetPreset::class.java)
             addExtension("presets", presets)
-
-            commonizer = commonizerContainer
 
             defaultJsCompilerType = PropertiesProvider(project).jsCompiler
         }

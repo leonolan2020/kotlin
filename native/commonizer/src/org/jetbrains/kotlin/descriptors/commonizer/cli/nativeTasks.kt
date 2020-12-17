@@ -5,9 +5,7 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer.cli
 
-import org.jetbrains.kotlin.commonizer.api.HierarchicalCommonizerOutputLayout
-import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.NativeDistributionCommonizerOutputLayout
+import org.jetbrains.kotlin.commonizer.api.*
 import org.jetbrains.kotlin.descriptors.commonizer.*
 import org.jetbrains.kotlin.descriptors.commonizer.EmptyRepository
 import org.jetbrains.kotlin.descriptors.commonizer.KonanDistribution
@@ -49,8 +47,10 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
     override fun execute(logPrefix: String) {
         val distribution = KonanDistribution(getMandatory<File, NativeDistributionOptionType>())
         val destination = getMandatory<File, OutputOptionType>()
-        val targets = getMandatory<List<KonanTarget>, NativeTargetsOptionType>()
-        val targetLibraries = getMandatory<List<File>, LibrariesSetOptionType>()
+        val targetLibraries = getMandatory<List<File>, TargetLibrariesOptionType>()
+        val dependencyLibraries = getMandatory<List<File>, DependencyLibrariesOptionType>()
+        val outputHierarchy = getMandatory<SharedCommonizerTarget, OutputHierarchyOptionType>()
+
         val statsType = getOptional<StatsType, StatsTypeOptionType> { it == "log-stats" } ?: StatsType.NONE
 
         val logger = CliLoggerAdapter(2)
@@ -59,8 +59,9 @@ internal class Commonize(options: Collection<Option<*>>) : Task(options) {
         NativeDistributionCommonizer(
             konanDistribution = distribution,
             repository = FilesRepository(targetLibraries.toSet(), libraryLoader),
-            dependencies = KonanDistributionRepository(distribution, targets.toSet(), libraryLoader),
-            targets = targets,
+            dependencies = KonanDistributionRepository(distribution, outputHierarchy.konanTargets, libraryLoader) +
+                    FilesRepository(dependencyLibraries.toSet(), libraryLoader),
+            targets = outputHierarchy.konanTargets.toList(),
             destination = destination,
             destinationLayout = HierarchicalCommonizerOutputLayout,
             statsType = statsType,

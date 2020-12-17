@@ -48,8 +48,9 @@ internal enum class TaskType(
         listOf(
             NativeDistributionOptionType,
             OutputOptionType,
-            NativeTargetsOptionType,
-            LibrariesSetOptionType
+            TargetLibrariesOptionType,
+            DependencyLibrariesOptionType,
+            OutputHierarchyOptionType,
         ),
         ::Commonize
     )

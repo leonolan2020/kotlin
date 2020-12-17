@@ -9,21 +9,13 @@ import org.gradle.api.DomainObjectCollection
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Attribute
-import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.SharedCommonizerTarget
-import org.jetbrains.kotlin.commonizer.api.identityString
+import org.jetbrains.kotlin.commonizer.api.*
 import org.jetbrains.kotlin.compilerRunner.konanHome
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
 import org.jetbrains.kotlin.gradle.plugin.KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
-import org.jetbrains.kotlin.gradle.plugin.mpp.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.CompilationSourceSetUtil.compilationsBySourceSets
-import org.jetbrains.kotlin.gradle.targets.metadata.ALL_COMPILE_METADATA_CONFIGURATION_NAME
-import org.jetbrains.kotlin.gradle.utils.`is`
-import org.jetbrains.kotlin.gradle.utils.filterValuesNotNull
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 
@@ -103,9 +95,7 @@ private fun Project.registerInteropBundleCommonizerTransformation() = dependenci
         spec.parameters { parameters ->
             parameters.konanHome = File(project.konanHome).absoluteFile
             parameters.commonizerClasspath = configurations.getByName(KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME).resolve()
-            kotlin.targets.withType(KotlinNativeTarget::class.java).all { target ->
-                parameters.targets = parameters.targets + target.konanTarget
-            }
+            parameters.outputHierarchy = project.getCommonizerOutputHierarchy()
         }
     }
 }
@@ -152,11 +142,7 @@ private fun Project.getAllSharedCommonizerTargets(): Set<SharedCommonizerTarget>
         .map { sourceSet -> getCommonizerTarget(sourceSet) }
         .filterIsInstance<SharedCommonizerTarget>()
         .toSet()
-        .onEach { sharedCommonizerTarget ->
-            require(sharedCommonizerTarget.targets.all { it is LeafCommonizerTarget }) {
-                "Hierarchical commonization is not yet supported: $sharedCommonizerTarget"
-            }
-        }
+
 }
 
 private fun Configuration.setCommonizerTargetAttributeIfAbsent(target: CommonizerTarget) {
@@ -169,3 +155,8 @@ private fun Configuration.setCommonizerTargetAttributeIfAbsent(value: String) {
     }
 }
 
+private fun Project.getCommonizerOutputHierarchy(): SharedCommonizerTarget? {
+    return getAllSharedCommonizerTargets().maxBy { it.order }?.also { target ->
+        require(target.order <= 1) { "Commonizer only supports one level of hierarchy at the moment" }
+    }
+}

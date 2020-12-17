@@ -52,3 +52,20 @@ private val SharedCommonizerTarget.identityString: String
             separator = ", ", prefix = "[", postfix = "]"
         )
     }
+
+public val CommonizerTarget.konanTargets: Set<KonanTarget>
+    get() {
+        return when (this) {
+            is LeafCommonizerTarget -> setOf(konanTarget)
+            is SharedCommonizerTarget -> targets.flatMap { it.konanTargets }.toSet()
+        }
+    }
+
+
+public val CommonizerTarget.order: Int
+    get() {
+        return when (this) {
+            is LeafCommonizerTarget -> return 0
+            is SharedCommonizerTarget -> targets.maxOf { it.order } + 1
+        }
+    }

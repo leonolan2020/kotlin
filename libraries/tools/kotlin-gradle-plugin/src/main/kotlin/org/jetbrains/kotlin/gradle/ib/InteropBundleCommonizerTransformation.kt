@@ -14,23 +14,21 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
-import org.jetbrains.kotlin.konan.target.KonanTarget
+import org.jetbrains.kotlin.commonizer.api.CliCommonizer
+import org.jetbrains.kotlin.commonizer.api.SharedCommonizerTarget
+import org.jetbrains.kotlin.gradle.ib.InteropBundleCommonizerTransformation.Parameters
 import java.io.File
 import java.io.Serializable
-import java.net.URLClassLoader
 
 
-private const val commonizerMainClass = "org.jetbrains.kotlin.descriptors.commonizer.cli.CommonizerCLI"
-private const val commonizerMainFunction = "main"
-
-abstract class InteropBundleCommonizerTransformation : TransformAction<InteropBundleCommonizerTransformation.Parameters> {
+abstract class InteropBundleCommonizerTransformation : TransformAction<Parameters> {
     open class Parameters : TransformParameters, Serializable {
 
         @InputFile
         var konanHome: File? = null
 
         @Input
-        var targets: Set<KonanTarget> = emptySet()
+        var outputHierarchy: SharedCommonizerTarget? = null
 
         @Classpath
         var commonizerClasspath: Set<File>? = null
@@ -41,29 +39,24 @@ abstract class InteropBundleCommonizerTransformation : TransformAction<InteropBu
     abstract val interopBundle: Provider<FileSystemLocation>
 
     override fun transform(outputs: TransformOutputs) {
-        println("Commonizing ${interopBundle.get().asFile} into ${parameters.targets}")
-        val interopBundleFile = interopBundle.get().asFile
-        val klibs = interopBundleFile.walkTopDown().filter { it.isFile && it.extension == "klib" }.toSet()
-        println("Klibs: $klibs")
-        val commandLineArguments = buildCommandLineArguments(outputs.dir("commonized"), klibs)
-        println("Command line args=$commandLineArguments")
-
+        val konanHome = parameters.konanHome ?: error("Missing konanHome")
+        val outputHierarchy = parameters.outputHierarchy ?: error("Missing outputHierarchy")
         val commonizerClasspath = parameters.commonizerClasspath ?: error("Missing commonizerClasspath")
-        val commonizerClassLoader = URLClassLoader(commonizerClasspath.map { it.absoluteFile.toURI().toURL() }.toTypedArray())
-        val commonizerMainClass = commonizerClassLoader.loadClass(commonizerMainClass)
-        val commonizerMainMethod = commonizerMainClass.methods.single { it.name == commonizerMainFunction }
-        commonizerMainMethod.invoke(null, commandLineArguments.toTypedArray())
+
+        val commonizer = CliCommonizer(commonizerClasspath)
+        commonizer(
+            konanHome = konanHome,
+            targetLibraries = klibs(),
+            dependencyLibraries = emptySet(),
+            outputHierarchy = outputHierarchy,
+            outputDirectory = outputs.dir("commonized")
+        )
     }
 
-    private fun buildCommandLineArguments(output: File, klibs: Set<File>): List<String> {
-        val konanHome = parameters.konanHome ?: error("Missing konanHome")
-        return mutableListOf<String>().apply {
-            add("commonize")
-            add("-distribution-path"); add(konanHome.absolutePath)
-            add("-targets"); add(parameters.targets.joinToString(","))
-            add("-output-path"); add(output.absolutePath)
-            add("-target-libraries"); add(klibs.joinToString(";") { it.absolutePath })
-        }
+    private fun klibs(): Set<File> {
+        return interopBundle.get().asFile.walkTopDown().maxDepth(2)
+            .filter { file -> file.isFile && file.extension == "klib" }
+            .toSet()
     }
 }
 

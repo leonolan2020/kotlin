@@ -217,7 +217,7 @@ internal open class CommonizerTask @Inject constructor(
     }
 }
 
-internal fun callCommonizerCLI(project: Project, commandLineArguments: List<String>) {
+private fun callCommonizerCLI(project: Project, commandLineArguments: List<String>) {
     if (commandLineArguments.isEmpty()) return
 
     KotlinNativeKlibCommonizerToolRunner(project).run(commandLineArguments)

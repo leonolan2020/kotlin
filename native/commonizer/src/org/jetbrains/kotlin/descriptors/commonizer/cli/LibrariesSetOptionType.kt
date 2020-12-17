@@ -8,12 +8,32 @@ package org.jetbrains.kotlin.descriptors.commonizer.cli
 import java.io.File
 
 
-internal object LibrariesSetOptionType : OptionType<List<File>>(
-    mandatory = true,
-    alias = "target-libraries",
-    description = "; and , separated (TODO NOW)"
+internal abstract class LibrariesSetOptionType(
+    mandatory: Boolean,
+    alias: String,
+    description: String
+) : OptionType<List<File>>(
+    mandatory = mandatory,
+    alias = alias,
+    description = description
 ) {
     override fun parse(rawValue: String, onError: (reason: String) -> Nothing): Option<List<File>> {
+        if (rawValue.isBlank()) {
+            return Option(this, emptyList())
+        }
         return Option(this, rawValue.split(";").map(::File))
     }
 }
+
+
+internal object TargetLibrariesOptionType : LibrariesSetOptionType(
+    mandatory = true,
+    alias = "target-libraries",
+    description = "';' separated list of klib file paths that will get commonized"
+)
+
+internal object DependencyLibrariesOptionType : LibrariesSetOptionType(
+    mandatory = true,
+    alias = "dependency-libraries",
+    description = "';' separated list of klib file paths that can be used as dependency"
+)

@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.descriptors.commonizer.builder
 
-import com.sun.xml.internal.xsom.impl.SimpleTypeImpl
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.commonizer.cir.*

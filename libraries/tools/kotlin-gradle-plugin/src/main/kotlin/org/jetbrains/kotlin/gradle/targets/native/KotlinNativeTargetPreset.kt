@@ -134,12 +134,7 @@ open class KotlinNativeTargetWithHostTestsPreset(name: String, project: Project,
         project.objects.newInstance(KotlinNativeTargetWithHostTests::class.java, project, konanTarget)
 }
 
-open class KotlinNativeTargetWithSimulatorTestsPreset(
-    name: String,
-    project: Project,
-    konanTarget: KonanTarget,
-    kotlinPluginVersion: String
-) :
+open class KotlinNativeTargetWithSimulatorTestsPreset(name: String, project: Project, konanTarget: KonanTarget, kotlinPluginVersion: String) :
     AbstractKotlinNativeTargetPreset<KotlinNativeTargetWithSimulatorTests>(name, project, konanTarget, kotlinPluginVersion) {
 
     override fun createTargetConfigurator(): KotlinNativeTargetWithSimulatorTestsConfigurator =

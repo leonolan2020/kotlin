@@ -8,11 +8,9 @@ package org.jetbrains.kotlin.gradle.dsl
 import groovy.lang.Closure
 import org.gradle.api.InvalidUserCodeException
 import org.gradle.api.NamedDomainObjectCollection
-import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.util.ConfigureUtil
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
-import org.jetbrains.kotlin.gradle.targets.native.internal.CommonizerRequest
 
 open class KotlinMultiplatformExtension :
     KotlinProjectExtension(),
@@ -26,9 +24,6 @@ open class KotlinMultiplatformExtension :
         internal set
 
     override lateinit var defaultJsCompilerType: KotlinJsCompilerType
-        internal set
-
-    lateinit var commonizer: NamedDomainObjectContainer<CommonizerRequest>
         internal set
 
     @Suppress("unused") // DSL
