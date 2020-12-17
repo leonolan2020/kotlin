@@ -5,10 +5,8 @@
 
 package org.jetbrains.kotlin.gradle.ib
 
+import org.gradle.api.DomainObjectCollection
 import org.gradle.api.Project
-import org.gradle.api.artifacts.transform.TransformAction
-import org.gradle.api.artifacts.transform.TransformOutputs
-import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.Usage
 import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
@@ -16,25 +14,28 @@ import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.SharedCommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.identityString
 import org.jetbrains.kotlin.compilerRunner.konanHome
+import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.Companion.attribute
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
+import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.CompilationSourceSetUtil.compilationsBySourceSets
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCompilation
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
-import org.jetbrains.kotlin.gradle.targets.metadata.ALL_COMPILE_METADATA_CONFIGURATION_NAME
+import org.jetbrains.kotlin.gradle.plugin.mpp.CompilationSourceSetUtil.sourceSetsInMultipleCompilations
 import org.jetbrains.kotlin.gradle.utils.filterValuesNotNull
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 
-object CommonizerTargetAttributes {
-    val attribute: Attribute<String> = Attribute.of("commonizerTarget", String::class.java)
-    const val matchAll = "*"
-    const val matchNone = "**none**"
-}
+val artifactTypeAttribute = Attribute.of("artifactType", String::class.java)
+val klibArtifactType = "org.jetbrains.kotlin.klib"
+val interopBundleArtifactType = "org.jetbrains.kotlin.kib"
+val commonizedInteropBundleArtifactType = "org.jetbrains.kotlin.kib.commonized"
+
+val commonizerTargetAttribute = Attribute.of("commonizer-target", String::class.java)
+val wildcardCommonizerTarget = "*"
+
 
 internal val Project.isInteropBundleTransformationEnabled: Boolean
     get() = PropertiesProvider(this).enableInteropBundleTransformation == true
@@ -52,12 +53,50 @@ private fun Project.setupTransformations() = dependencies.run {
 }
 
 private fun Project.setupAttributeSchema() {
-    dependencies.attributesSchema.attribute(CommonizerTargetAttributes.attribute)
-    getKotlinSourceSetsWithCommonizerTargets().forEach { (sourceSet, commonizerTarget) ->
-        setupAttributeSchema(sourceSet, commonizerTarget)
+    val kotlin = multiplatformExtensionOrNull ?: return
+    dependencies.attributesSchema.attribute(commonizerTargetAttribute)
+    dependencies.artifactTypes.register(interopBundleArtifactType)
+    dependencies.artifactTypes.register(commonizedInteropBundleArtifactType) { definition ->
+        definition.attributes.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
+    }
+
+    kotlin.targets.all { target ->
+        (target.compilations as DomainObjectCollection<KotlinCompilation<*>>).all { compilation ->
+            setupAttributeSchema(compilation)
+        }
     }
 }
 
+private fun Project.setupAttributeSchema(compilation: KotlinCompilation<*>) {
+    val commonizerTarget = getCommonizerTarget(compilation) ?: return
+    val configurationsNames = compilation.relatedConfigurationNames.toSet()
+    val configurations = configurationsNames.map { name -> configurations.getByName(name) }
+    configurations.forEach { configuration ->
+        configuration.attributes.attribute(commonizerTargetAttribute, commonizerTarget.identityString)
+    }
+}
+
+private fun Project.getCommonizerTarget(compilation: KotlinCompilation<*>): CommonizerTarget? {
+    if (compilation is KotlinNativeCompilation) {
+        return LeafCommonizerTarget(compilation.konanTarget)
+    }
+
+    if (compilation is KotlinMetadataCompilation) {
+        val sourceSets = compilation.allKotlinSourceSets
+        val participatingKonanTargets = multiplatformExtension.targets
+            .flatMap { target -> target.compilations }
+            .filterIsInstance<KotlinNativeCompilation>()
+            .filter { nativeCompilation -> nativeCompilation.allKotlinSourceSets.any { it in sourceSets } }
+            .map { nativeCompilation -> nativeCompilation.konanTarget }
+        if (participatingKonanTargets.isEmpty()) return null
+        return CommonizerTarget(participatingKonanTargets)
+    }
+
+
+    return null
+}
+
+/*
 private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet, commonizerTarget: CommonizerTarget) {
     val sourceSetConfigurationNames = setOf(
         sourceSet.apiMetadataConfigurationName,
@@ -67,30 +106,20 @@ private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet, commonizerT
     )
     sourceSetConfigurationNames
         .map { name -> configurations.getByName(name) }
-        .forEach { configuration ->
-            configuration.attributes.attribute(CommonizerTargetAttributes.attribute, commonizerTarget.identityString)
-        }
-
-    val allSourceSetsCompileDependenciesMetadataConfiguration = configurations.findByName(ALL_COMPILE_METADATA_CONFIGURATION_NAME)
-    allSourceSetsCompileDependenciesMetadataConfiguration?.run {
-        attributes.attribute(Usage.USAGE_ATTRIBUTE, project.usage(KotlinUsages.KOTLIN_API))
-        attributes.attribute(
-            CommonizerTargetAttributes.attribute,
-            CommonizerTarget(KonanTarget.LINUX_X64, KonanTarget.MACOS_X64).identityString
-        )
-    }
+        .forEach { configuration -> configuration.attributes.attribute(commonizerTargetAttribute, commonizerTarget.identityString) }
 }
+ */
 
 private fun Project.registerInteropBundleCommonizerTransformation() = dependencies.run {
     val kotlin = multiplatformExtensionOrNull ?: return
     registerTransform(InteropBundleCommonizerTransformation::class.java) { spec ->
-        spec.from.attribute(Usage.USAGE_ATTRIBUTE, project.usage(CommonizerUsages.interopBundle))
-        spec.to.attribute(Usage.USAGE_ATTRIBUTE, project.usage(CommonizerUsages.commonizerOutput))
+
+        spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
+        spec.to.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
+
         spec.parameters { parameters ->
             parameters.konanHome = File(project.konanHome).absoluteFile
-            afterEvaluate {
-                parameters.commonizerClasspath = configurations.getByName("kotlinKlibCommonizerClasspath").resolve()
-            }
+            afterEvaluate { parameters.commonizerClasspath = configurations.getByName("kotlinKlibCommonizerClasspath").resolve() }
             kotlin.targets.withType(KotlinNativeTarget::class.java).all { target ->
                 parameters.targets = parameters.targets + target.konanTarget
             }
@@ -101,14 +130,12 @@ private fun Project.registerInteropBundleCommonizerTransformation() = dependenci
 private fun Project.registerInteropBundlePlatformSelectionTransformation() = dependencies.run {
     for ((_, konanTarget) in KonanTarget.predefinedTargets) {
         registerTransform(InteropBundlePlatformSelectionTransformation::class.java) { spec ->
-            spec.from.attribute(Usage.USAGE_ATTRIBUTE, project.usage(CommonizerUsages.interopBundle))
-            spec.from.attribute(KotlinNativeTarget.konanTargetAttribute, "commonizer")
-            spec.from.attribute(CommonizerTargetAttributes.attribute, CommonizerTargetAttributes.matchAll)
 
-            spec.to.attribute(Usage.USAGE_ATTRIBUTE, project.usage(KotlinUsages.KOTLIN_API))
-            spec.to.attribute(KotlinNativeTarget.konanTargetAttribute, konanTarget.name)
-            spec.from.attribute(CommonizerTargetAttributes.attribute, LeafCommonizerTarget(konanTarget).identityString)
+            spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
+            spec.to.attribute(artifactTypeAttribute, klibArtifactType)
 
+            spec.from.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
+            spec.to.attribute(commonizerTargetAttribute, CommonizerTarget(konanTarget).identityString)
 
             spec.parameters { parameters ->
                 parameters.target = LeafCommonizerTarget(konanTarget)
@@ -117,22 +144,13 @@ private fun Project.registerInteropBundlePlatformSelectionTransformation() = dep
     }
 }
 
-abstract class EmptyTransform : TransformAction<TransformParameters.None> {
-    override fun transform(outputs: TransformOutputs) {
-    }
-}
-
 private fun Project.registerCommonizerOutputSelectionTransformation() = dependencies.run {
     project.afterEvaluate {
         for (sharedCommonizerTarget in getAllSharedCommonizerTargets()) {
             registerTransform(CommonizerOutputSelectionTransformation::class.java) { spec ->
-                spec.from.attribute(Usage.USAGE_ATTRIBUTE, project.usage(CommonizerUsages.commonizerOutput))
-                spec.from.attribute(attribute, KotlinPlatformType.native)
-                spec.from.attribute(CommonizerTargetAttributes.attribute, CommonizerTargetAttributes.matchAll)
 
-                spec.to.attribute(Usage.USAGE_ATTRIBUTE, project.usage(KotlinUsages.KOTLIN_METADATA))
-                spec.to.attribute(attribute, KotlinPlatformType.common)
-                spec.to.attribute(CommonizerTargetAttributes.attribute, sharedCommonizerTarget.identityString)
+                spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
+                spec.to.attribute(artifactTypeAttribute, klibArtifactType)
 
                 spec.parameters { parameters ->
                     parameters.target = sharedCommonizerTarget
