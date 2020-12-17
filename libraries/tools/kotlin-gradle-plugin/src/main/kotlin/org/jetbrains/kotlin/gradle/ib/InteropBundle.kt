@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.gradle.ib
 
 import org.gradle.api.DomainObjectCollection
 import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Attribute
 import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.LeafCommonizerTarget
@@ -20,6 +21,7 @@ import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.CompilationSourceSetUtil.compilationsBySourceSets
 import org.jetbrains.kotlin.gradle.targets.metadata.ALL_COMPILE_METADATA_CONFIGURATION_NAME
+import org.jetbrains.kotlin.gradle.utils.`is`
 import org.jetbrains.kotlin.gradle.utils.filterValuesNotNull
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
@@ -61,18 +63,15 @@ private fun Project.setupAttributeSchema() {
     }
 
     kotlin.targets.all { target ->
-        (target.compilations as DomainObjectCollection<KotlinCompilation<*>>).all { compilation ->
-            setupAttributeSchema(compilation)
+        (target.compilations as DomainObjectCollection<*>).all { compilation ->
+            if (compilation is KotlinCompilation<*>) {
+                setupAttributeSchema(compilation)
+            }
         }
     }
 
-    configurations.findByName(ALL_COMPILE_METADATA_CONFIGURATION_NAME)
-        ?.attributes?.attribute(commonizerTargetAttribute, interopBundleCommonizerTarget)
-
-    configurations.all { configuration ->
-        if (!configuration.attributes.contains(commonizerTargetAttribute)) {
-            configuration.attributes.attribute(commonizerTargetAttribute, "**none**")
-        }
+    kotlin.sourceSets.all { sourceSet ->
+        setupAttributeSchema(sourceSet)
     }
 }
 
@@ -80,20 +79,30 @@ private fun Project.setupAttributeSchema(compilation: KotlinCompilation<*>) {
     val commonizerTarget = getCommonizerTarget(compilation) ?: return
     val configurationsNames = compilation.relatedConfigurationNames.toSet()
     val configurations = configurationsNames.mapNotNull { name -> configurations.findByName(name) }
-    configurations.forEach { configuration ->
-        configuration.attributes.attribute(commonizerTargetAttribute, commonizerTarget.identityString)
-    }
+    configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
 }
 
 fun getCommonizerTarget(compilation: KotlinCompilation<*>): CommonizerTarget? {
-    if (compilation is KotlinNativeCompilation) {
-        return LeafCommonizerTarget(compilation.konanTarget)
+    val konanTargets = compilation.konanTargets
+    if (konanTargets.isNotEmpty()) {
+        return CommonizerTarget(konanTargets)
     }
+    return null
+}
 
-    if (compilation is KotlinSharedNativeCompilation) {
-        return CommonizerTarget(compilation.konanTargets)
+private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet) {
+    val commonizerTarget = getCommonizerTarget(sourceSet) ?: return
+    val configurationsNames = sourceSet.relatedConfigurationNames.toSet()
+    val configurations = configurationsNames.mapNotNull { name -> configurations.findByName(name) }
+    configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
+}
+
+private fun Project.getCommonizerTarget(sourceSet: KotlinSourceSet): CommonizerTarget? {
+    val compilations = compilationsBySourceSets(this)[sourceSet] ?: return null
+    val konanTargetsInvolved = compilations.flatMap { compilation -> compilation.konanTargets }
+    if (konanTargetsInvolved.isNotEmpty()) {
+        return CommonizerTarget(konanTargetsInvolved)
     }
-
     return null
 }
 
@@ -101,11 +110,9 @@ private fun Project.registerInteropBundleCommonizerTransformation() = dependenci
     val kotlin = multiplatformExtensionOrNull ?: return
     registerTransform(InteropBundleCommonizerTransformation::class.java) { spec ->
 
-        /*
+
         spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
         spec.to.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
-
-         */
 
         spec.from.attribute(commonizerTargetAttribute, interopBundleCommonizerTarget)
         spec.to.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
@@ -125,10 +132,8 @@ private fun Project.registerCommonizerOutputSelectionTransformation() = dependen
     for (sharedCommonizerTarget in getAllSharedCommonizerTargets()) {
         registerTransform(CommonizerOutputSelectionTransformation::class.java) { spec ->
 
-            /*
             spec.from.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
             spec.to.attribute(artifactTypeAttribute, klibArtifactType)
-             */
 
             spec.from.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
             spec.to.attribute(commonizerTargetAttribute, sharedCommonizerTarget.identityString)
@@ -179,3 +184,22 @@ private fun Project.getKotlinSourceSetsWithCommonizerTargets(): Map<KotlinSource
 private fun Project.getAllSharedCommonizerTargets(): Set<SharedCommonizerTarget> {
     return getKotlinSourceSetsWithCommonizerTargets().values.filterIsInstance<SharedCommonizerTarget>().toSet()
 }
+
+private fun Configuration.setCommonizerTargetAttributeIfAbsent(target: CommonizerTarget) {
+    setCommonizerTargetAttributeIfAbsent(target.identityString)
+}
+
+private fun Configuration.setCommonizerTargetAttributeIfAbsent(value: String) {
+    if (!attributes.contains(commonizerTargetAttribute)) {
+        attributes.attribute(commonizerTargetAttribute, value)
+    }
+}
+
+private val KotlinCompilation<*>.konanTargets: Set<KonanTarget>
+    get() {
+        return when (this) {
+            is KotlinSharedNativeCompilation -> konanTargets.toSet()
+            is KotlinNativeCompilation -> setOf(konanTarget)
+            else -> emptySet()
+        }
+    }
