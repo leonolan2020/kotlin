@@ -649,6 +649,7 @@ tasks {
     register("jsCompilerTest") {
         dependsOn(":js:js.tests:test")
         dependsOn(":js:js.tests:runMocha")
+        dependsOn("wasmCompilerTest")
     }
 
     register("wasmCompilerTest") {
@@ -711,7 +712,6 @@ tasks {
     }
 
     register("miscCompilerTest") {
-        dependsOn("wasmCompilerTest")
         dependsOn("nativeCompilerTest")
         dependsOn("firCompilerTest")
 
