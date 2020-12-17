@@ -15,9 +15,13 @@ import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.bundling.Zip
+import org.jetbrains.kotlin.commonizer.api.CommonizerTarget
+import org.jetbrains.kotlin.commonizer.api.identityString
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
+import org.jetbrains.kotlin.gradle.ib.commonizerTargetAttribute
+import org.jetbrains.kotlin.gradle.ib.getCommonizerTarget
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.CompilationSourceSetUtil.compilationsBySourceSets
@@ -29,6 +33,7 @@ import org.jetbrains.kotlin.gradle.tasks.locateTask
 import org.jetbrains.kotlin.gradle.tasks.registerTask
 import org.jetbrains.kotlin.gradle.utils.addExtendsFromRelation
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
+import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.statistics.metrics.BooleanMetrics
 
 internal const val ALL_COMPILE_METADATA_CONFIGURATION_NAME = "allSourceSetsCompileDependenciesMetadata"
@@ -460,6 +465,7 @@ class KotlinMetadataTargetConfigurator(kotlinPluginVersion: String) :
                 }
 
                 val artifactView = fromFiles.incoming.artifactView { view ->
+                    view.attributes.attribute(commonizerTargetAttribute, getCommonizerTarget(compilation)?.identityString ?: "**none**")
                     view.componentFilter { id ->
                         allResolutionsByComponentId[id].let { resolutions ->
                             resolutions == null || resolutions.any { it !is MetadataDependencyResolution.ExcludeAsUnrequested }

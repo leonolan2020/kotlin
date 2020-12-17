@@ -171,7 +171,14 @@ abstract class AbstractKotlinCompilation<T : KotlinCommonOptions>(
     override val compileAllTaskName: String
         get() = lowerCamelCaseName(target.disambiguationClassifier, compilationName, "classes")
 
-    override lateinit var compileDependencyFiles: FileCollection
+    private var _compileDependencyFiles: FileCollection? = null
+    override var compileDependencyFiles: FileCollection
+        set(value) {
+            _compileDependencyFiles = value
+        }
+        get() {
+            return checkNotNull(_compileDependencyFiles)
+        }
 
     override val apiConfigurationName: String
         get() = disambiguateName(API)
