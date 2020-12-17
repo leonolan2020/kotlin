@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinSharedNativeCompilation
 
-fun Project.getCommonizerTarget(compilation: KotlinCompilation<*>): CommonizerTarget? {
+internal fun Project.getCommonizerTarget(compilation: KotlinCompilation<*>): CommonizerTarget? {
     if (compilation is KotlinNativeCompilation) {
         return LeafCommonizerTarget(compilation.konanTarget)
     }

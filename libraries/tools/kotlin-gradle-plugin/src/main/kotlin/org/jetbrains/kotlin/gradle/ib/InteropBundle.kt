@@ -94,8 +94,6 @@ private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet) {
 private fun Project.registerInteropBundleCommonizerTransformation() = dependencies.run {
     val kotlin = multiplatformExtensionOrNull ?: return
     registerTransform(InteropBundleCommonizerTransformation::class.java) { spec ->
-
-
         spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
         spec.to.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
 
@@ -111,7 +109,6 @@ private fun Project.registerInteropBundleCommonizerTransformation() = dependenci
         }
     }
 }
-
 
 private fun Project.registerCommonizerOutputSelectionTransformation() = dependencies.run {
     for (sharedCommonizerTarget in getAllSharedCommonizerTargets()) {
