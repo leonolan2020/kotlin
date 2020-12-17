@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.commonizer.api.SharedCommonizerTarget
 import org.jetbrains.kotlin.commonizer.api.identityString
 import org.jetbrains.kotlin.compilerRunner.konanHome
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
+import org.jetbrains.kotlin.gradle.plugin.KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
@@ -82,28 +83,12 @@ private fun Project.setupAttributeSchema(compilation: KotlinCompilation<*>) {
     configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
 }
 
-fun getCommonizerTarget(compilation: KotlinCompilation<*>): CommonizerTarget? {
-    val konanTargets = compilation.konanTargets
-    if (konanTargets.isNotEmpty()) {
-        return CommonizerTarget(konanTargets)
-    }
-    return null
-}
 
 private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet) {
     val commonizerTarget = getCommonizerTarget(sourceSet) ?: return
     val configurationsNames = sourceSet.relatedConfigurationNames.toSet()
     val configurations = configurationsNames.mapNotNull { name -> configurations.findByName(name) }
     configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
-}
-
-private fun Project.getCommonizerTarget(sourceSet: KotlinSourceSet): CommonizerTarget? {
-    val compilations = compilationsBySourceSets(this)[sourceSet] ?: return null
-    val konanTargetsInvolved = compilations.flatMap { compilation -> compilation.konanTargets }
-    if (konanTargetsInvolved.isNotEmpty()) {
-        return CommonizerTarget(konanTargetsInvolved)
-    }
-    return null
 }
 
 private fun Project.registerInteropBundleCommonizerTransformation() = dependencies.run {
@@ -119,7 +104,7 @@ private fun Project.registerInteropBundleCommonizerTransformation() = dependenci
 
         spec.parameters { parameters ->
             parameters.konanHome = File(project.konanHome).absoluteFile
-            parameters.commonizerClasspath = configurations.getByName("kotlinKlibCommonizerClasspath").resolve()
+            parameters.commonizerClasspath = configurations.getByName(KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME).resolve()
             kotlin.targets.withType(KotlinNativeTarget::class.java).all { target ->
                 parameters.targets = parameters.targets + target.konanTarget
             }
@@ -163,26 +148,18 @@ private fun Project.registerInteropBundlePlatformSelectionTransformation() = dep
     }
 }
 
-private fun Project.getKotlinSourceSetsWithCommonizerTargets(): Map<KotlinSourceSet, CommonizerTarget> {
-    return compilationsBySourceSets(project)
-        .mapValues { (_, compilations) ->
-            val leafCommonizerTargetsOfSourceSet = compilations
-                .filterIsInstance<KotlinNativeCompilation>()
-                .map { kotlinNativeCompilation -> kotlinNativeCompilation.konanTarget }
-                .map { konanTarget -> LeafCommonizerTarget(konanTarget) }
-                .toSet()
-
-            when {
-                leafCommonizerTargetsOfSourceSet.isEmpty() -> null
-                leafCommonizerTargetsOfSourceSet.size == 1 -> leafCommonizerTargetsOfSourceSet.single()
-                else -> SharedCommonizerTarget(leafCommonizerTargetsOfSourceSet)
-            }
-        }
-        .filterValuesNotNull()
-}
 
 private fun Project.getAllSharedCommonizerTargets(): Set<SharedCommonizerTarget> {
-    return getKotlinSourceSetsWithCommonizerTargets().values.filterIsInstance<SharedCommonizerTarget>().toSet()
+    val kotlin = multiplatformExtensionOrNull ?: return emptySet()
+    return kotlin.sourceSets
+        .map { sourceSet -> getCommonizerTarget(sourceSet) }
+        .filterIsInstance<SharedCommonizerTarget>()
+        .toSet()
+        .onEach { sharedCommonizerTarget ->
+            require(sharedCommonizerTarget.targets.all { it is LeafCommonizerTarget }) {
+                "Hierarchical commonization is not yet supported: $sharedCommonizerTarget"
+            }
+        }
 }
 
 private fun Configuration.setCommonizerTargetAttributeIfAbsent(target: CommonizerTarget) {
@@ -195,11 +172,3 @@ private fun Configuration.setCommonizerTargetAttributeIfAbsent(value: String) {
     }
 }
 
-private val KotlinCompilation<*>.konanTargets: Set<KonanTarget>
-    get() {
-        return when (this) {
-            is KotlinSharedNativeCompilation -> konanTargets.toSet()
-            is KotlinNativeCompilation -> setOf(konanTarget)
-            else -> emptySet()
-        }
-    }

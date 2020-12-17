@@ -465,7 +465,9 @@ class KotlinMetadataTargetConfigurator(kotlinPluginVersion: String) :
                 }
 
                 val artifactView = fromFiles.incoming.artifactView { view ->
-                    view.attributes.attribute(commonizerTargetAttribute, getCommonizerTarget(compilation)?.identityString ?: "**none**")
+                    view.attributes.attribute(
+                        commonizerTargetAttribute, project.getCommonizerTarget(compilation)?.identityString ?: "**none**"
+                    )
                     view.componentFilter { id ->
                         allResolutionsByComponentId[id].let { resolutions ->
                             resolutions == null || resolutions.any { it !is MetadataDependencyResolution.ExcludeAsUnrequested }
