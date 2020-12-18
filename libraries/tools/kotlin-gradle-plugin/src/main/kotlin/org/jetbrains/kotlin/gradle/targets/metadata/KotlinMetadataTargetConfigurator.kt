@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.commonizer.api.identityString
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
-import org.jetbrains.kotlin.gradle.ib.commonizerTargetAttribute
+import org.jetbrains.kotlin.gradle.ib.COMMONIZER_TARGET_ATTRIBUTE
 import org.jetbrains.kotlin.gradle.ib.getCommonizerTarget
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
@@ -461,7 +461,7 @@ class KotlinMetadataTargetConfigurator(kotlinPluginVersion: String) :
 
                 val artifactView = fromFiles.incoming.artifactView { view ->
                     view.attributes.attribute(
-                        commonizerTargetAttribute, project.getCommonizerTarget(compilation)?.identityString ?: "**none**"
+                        COMMONIZER_TARGET_ATTRIBUTE, project.getCommonizerTarget(compilation)?.identityString ?: "**none**"
                     )
                     view.componentFilter { id ->
                         allResolutionsByComponentId[id].let { resolutions ->

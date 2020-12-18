@@ -5,158 +5,106 @@
 
 package org.jetbrains.kotlin.gradle.ib
 
-import org.gradle.api.DomainObjectCollection
+import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Attribute
-import org.jetbrains.kotlin.commonizer.api.*
-import org.jetbrains.kotlin.compilerRunner.konanHome
-import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
-import org.jetbrains.kotlin.gradle.plugin.KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME
-import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
-import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
-import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
+import org.gradle.api.attributes.Usage
+import org.gradle.api.tasks.*
+import org.gradle.api.tasks.bundling.Zip
+import org.jetbrains.kotlin.gradle.ib.InteropBundlePlugin.Companion.konanTargets
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.konan.target.KonanTarget
-import java.io.File
 
-val artifactTypeAttribute = Attribute.of("artifactType", String::class.java)
-val klibArtifactType = "org.jetbrains.kotlin.klib"
-val interopBundleArtifactType = "org.jetbrains.kotlin.kib"
-val commonizedInteropBundleArtifactType = "org.jetbrains.kotlin.kib.commonized"
+private const val INTEROP_BUNDLE_CONFIGURATION_NAME = "interopBundle"
+private const val CREATE_INTEROP_BUNDLE_TASK_NAME = "createInteropBundle"
+private const val CREATE_INTEROP_BUNDLE_KIB_TASK_NAME = "createInteropBundleKib"
 
-val commonizerTargetAttribute = Attribute.of("commonizer-target", String::class.java)
-val interopBundleCommonizerTarget = "*interob-bundle*"
-val wildcardCommonizerTarget = "*"
+internal val ARTIFACT_TYPE_ATTRIBUTE = Attribute.of("artifactType", String::class.java)
+internal const val KLIB_ARTIFACT_TYPE = "org.jetbrains.kotlin.klib"
+internal const val INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.interopBundle"
+internal const val ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.zippedInteropBundle"
+internal const val COMMONIZED_INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.commonizedInteropBundle"
 
 
-internal val Project.isInteropBundleTransformationEnabled: Boolean
-    get() = PropertiesProvider(this).enableInteropBundleTransformation == true
+open class InteropBundlePlugin : Plugin<Project> {
 
-internal fun Project.setupInteropBundleTransformationIfEnabled() {
-    if (!isInteropBundleTransformationEnabled) return
-    setupTransformations()
-}
-
-private fun Project.setupTransformations() = dependencies.run {
-    setupAttributeSchema()
-    registerInteropBundleCommonizerTransformation()
-    registerInteropBundlePlatformSelectionTransformation()
-    registerCommonizerOutputSelectionTransformation()
-}
-
-private fun Project.setupAttributeSchema() {
-    val kotlin = multiplatformExtensionOrNull ?: return
-    dependencies.attributesSchema.attribute(commonizerTargetAttribute)
-
-    dependencies.artifactTypes.register(interopBundleArtifactType) { definition ->
-        definition.attributes.attribute(commonizerTargetAttribute, interopBundleCommonizerTarget)
-    }
-    dependencies.artifactTypes.register(commonizedInteropBundleArtifactType) { definition ->
-        definition.attributes.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
+    override fun apply(target: Project) {
+        target.registerKonanTargetConfigurations()
+        target.registerInteropBundleConfiguration()
+        target.registerInteropBundleTasks()
+        target.registerArtifacts()
+        target.registerSoftwareComponent()
     }
 
-    kotlin.targets.all { target ->
-        (target.compilations as DomainObjectCollection<*>).all { compilation ->
-            if (compilation is KotlinCompilation<*>) {
-                setupAttributeSchema(compilation)
-            }
-        }
-    }
-
-    kotlin.sourceSets.all { sourceSet ->
-        setupAttributeSchema(sourceSet)
+    internal companion object {
+        val konanTargets: Set<KonanTarget> get() = KonanTarget.predefinedTargets.values.toSet()
     }
 }
 
-private fun Project.setupAttributeSchema(compilation: KotlinCompilation<*>) {
-    val commonizerTarget = getCommonizerTarget(compilation) ?: return
-    val configurationsNames = compilation.relatedConfigurationNames.toSet()
-    val configurations = configurationsNames.mapNotNull { name -> configurations.findByName(name) }
-    configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
-}
-
-
-private fun Project.setupAttributeSchema(sourceSet: KotlinSourceSet) {
-    val commonizerTarget = getCommonizerTarget(sourceSet) ?: return
-    val configurationsNames = sourceSet.relatedConfigurationNames.toSet()
-    val configurations = configurationsNames.mapNotNull { name -> configurations.findByName(name) }
-    configurations.forEach { configuration -> configuration.setCommonizerTargetAttributeIfAbsent(commonizerTarget) }
-}
-
-private fun Project.registerInteropBundleCommonizerTransformation() = dependencies.run {
-    val kotlin = multiplatformExtensionOrNull ?: return
-    registerTransform(InteropBundleCommonizerTransformation::class.java) { spec ->
-        spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
-        spec.to.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
-
-        spec.from.attribute(commonizerTargetAttribute, interopBundleCommonizerTarget)
-        spec.to.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
-
-        spec.parameters { parameters ->
-            parameters.konanHome = File(project.konanHome).absoluteFile
-            parameters.commonizerClasspath = configurations.getByName(KLIB_COMMONIZER_CLASSPATH_CONFIGURATION_NAME).resolve()
-            parameters.outputHierarchy = project.getCommonizerOutputHierarchy()
+private fun Project.registerKonanTargetConfigurations() {
+    konanTargets.forEach { target ->
+        configurations.register(target.name) { configuration ->
+            configuration.isCanBeConsumed = false
+            configuration.isCanBeResolved = true
+            configuration.attributes.attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage::class.java, KotlinUsages.KOTLIN_API))
+            configuration.attributes.attribute(KotlinPlatformType.attribute, KotlinPlatformType.native)
+            configuration.attributes.attribute(KotlinNativeTarget.konanTargetAttribute, target.name)
         }
     }
 }
 
-private fun Project.registerCommonizerOutputSelectionTransformation() = dependencies.run {
-    for (sharedCommonizerTarget in getAllSharedCommonizerTargets()) {
-        registerTransform(CommonizerOutputSelectionTransformation::class.java) { spec ->
-
-            spec.from.attribute(artifactTypeAttribute, commonizedInteropBundleArtifactType)
-            spec.to.attribute(artifactTypeAttribute, klibArtifactType)
-
-            spec.from.attribute(commonizerTargetAttribute, wildcardCommonizerTarget)
-            spec.to.attribute(commonizerTargetAttribute, sharedCommonizerTarget.identityString)
-
-            spec.parameters { parameters ->
-                parameters.target = sharedCommonizerTarget
-            }
-        }
+private fun Project.registerInteropBundleConfiguration() {
+    configurations.register(INTEROP_BUNDLE_CONFIGURATION_NAME) { configuration ->
+        configuration.isCanBeResolved = false
+        configuration.isCanBeConsumed = true
+        configuration.attributes.attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage::class.java, KotlinUsages.KOTLIN_API))
+        configuration.outgoing.attributes.attribute(COMMONIZER_TARGET_ATTRIBUTE, INTEROP_BUNDLE_COMMONIZIER_TARGET)
     }
 }
 
+private fun Project.registerInteropBundleTasks() {
+    val createInteropBundleTask = tasks.register(CREATE_INTEROP_BUNDLE_TASK_NAME, CreateInteropBundleTask::class.java) { task ->
+        task.group = "build"
+    }
 
-private fun Project.registerInteropBundlePlatformSelectionTransformation() = dependencies.run {
-    for ((_, konanTarget) in KonanTarget.predefinedTargets) {
-        registerTransform(InteropBundlePlatformSelectionTransformation::class.java) { spec ->
+    tasks.register(CREATE_INTEROP_BUNDLE_KIB_TASK_NAME, Zip::class.java) { task ->
+        task.group = "build"
+        task.dependsOn(createInteropBundleTask)
+        task.from(createInteropBundleTask.flatMap { it.outputDirectory })
+        task.destinationDirectory.set(buildDir)
+        task.archiveBaseName.set("interopBundle")
+        task.archiveExtension.set("kib")
+    }
 
-            spec.from.attribute(artifactTypeAttribute, interopBundleArtifactType)
-            spec.to.attribute(artifactTypeAttribute, klibArtifactType)
+    tasks.register("clean", Delete::class.java) { task ->
+        task.group = "build"
+        task.delete(buildDir)
+    }
 
-            spec.from.attribute(commonizerTargetAttribute, interopBundleCommonizerTarget)
-            spec.to.attribute(commonizerTargetAttribute, CommonizerTarget(konanTarget).identityString)
+    tasks.register("assemble") { task ->
+        task.group = "build"
+        task.dependsOn(CREATE_INTEROP_BUNDLE_KIB_TASK_NAME)
+    }
 
-            spec.parameters { parameters ->
-                parameters.target = LeafCommonizerTarget(konanTarget)
-            }
-        }
+    tasks.register("build") { task ->
+        task.group = "build"
+        task.dependsOn("assemble")
     }
 }
 
-
-private fun Project.getAllSharedCommonizerTargets(): Set<SharedCommonizerTarget> {
-    val kotlin = multiplatformExtensionOrNull ?: return emptySet()
-    return kotlin.sourceSets
-        .map { sourceSet -> getCommonizerTarget(sourceSet) }
-        .filterIsInstance<SharedCommonizerTarget>()
-        .toSet()
-
-}
-
-private fun Configuration.setCommonizerTargetAttributeIfAbsent(target: CommonizerTarget) {
-    setCommonizerTargetAttributeIfAbsent(target.identityString)
-}
-
-private fun Configuration.setCommonizerTargetAttributeIfAbsent(value: String) {
-    if (!attributes.contains(commonizerTargetAttribute)) {
-        attributes.attribute(commonizerTargetAttribute, value)
+private fun Project.registerArtifacts() {
+    artifacts.add(INTEROP_BUNDLE_CONFIGURATION_NAME, createInteropBundleKibTask.flatMap { it.archiveFile }) { artifact ->
+        artifact.builtBy(createInteropBundleKibTask)
+        artifact.type = ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE
+        artifact.extension = "kib"
     }
 }
 
-private fun Project.getCommonizerOutputHierarchy(): SharedCommonizerTarget? {
-    return getAllSharedCommonizerTargets().maxBy { it.order }?.also { target ->
-        require(target.order <= 1) { "Commonizer only supports one level of hierarchy at the moment" }
-    }
+private fun Project.registerSoftwareComponent() {
+
 }
+
+private val Project.createInteropBundleKibTask: TaskProvider<Zip>
+    get() = tasks.withType(Zip::class.java).named(CREATE_INTEROP_BUNDLE_KIB_TASK_NAME)
