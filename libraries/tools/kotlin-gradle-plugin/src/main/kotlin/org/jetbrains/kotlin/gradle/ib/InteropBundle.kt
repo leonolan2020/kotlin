@@ -9,13 +9,21 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.Usage
-import org.gradle.api.tasks.*
+import org.gradle.api.component.SoftwareComponentFactory
+import org.gradle.api.internal.project.ProjectInternal
+import org.gradle.api.provider.Property
+import org.gradle.api.publish.PublishingExtension
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Zip
 import org.jetbrains.kotlin.gradle.ib.InteropBundlePlugin.Companion.konanTargets
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.konan.target.KonanTarget
+
+private const val INTEROP_BUNDLE_EXTENSION_NAME = "interopBundle"
 
 private const val INTEROP_BUNDLE_CONFIGURATION_NAME = "interopBundle"
 private const val CREATE_INTEROP_BUNDLE_TASK_NAME = "createInteropBundle"
@@ -26,16 +34,28 @@ internal const val KLIB_ARTIFACT_TYPE = "org.jetbrains.kotlin.klib"
 internal const val INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.interopBundle"
 internal const val ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.zippedInteropBundle"
 internal const val COMMONIZED_INTEROP_BUNDLE_ARTIFACT_TYPE = "org.jetbrains.kotlin.commonizedInteropBundle"
+internal const val ZIPPED_INTEROP_BUNDLE_FILE_EXTENSION = "kib"
 
+open class InteropBundleExtension(internal val project: Project) {
+    val version: Property<String> = project.objects.property(String::class.java)
+        .convention(project.provider { project.version.toString() })
+
+    val groupId: Property<String> = project.objects.property(String::class.java)
+        .convention(project.provider { project.group.toString() })
+
+    val artifactId: Property<String> = project.objects.property(String::class.java)
+        .convention(project.provider { project.name.toString() })
+}
 
 open class InteropBundlePlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
+        target.extensions.create(INTEROP_BUNDLE_EXTENSION_NAME, InteropBundleExtension::class.java, target)
         target.registerKonanTargetConfigurations()
         target.registerInteropBundleConfiguration()
         target.registerInteropBundleTasks()
         target.registerArtifacts()
-        target.registerSoftwareComponent()
+        target.setupPublication()
     }
 
     internal companion object {
@@ -60,7 +80,6 @@ private fun Project.registerInteropBundleConfiguration() {
         configuration.isCanBeResolved = false
         configuration.isCanBeConsumed = true
         configuration.attributes.attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage::class.java, KotlinUsages.KOTLIN_API))
-        configuration.outgoing.attributes.attribute(COMMONIZER_TARGET_ATTRIBUTE, INTEROP_BUNDLE_COMMONIZIER_TARGET)
     }
 }
 
@@ -75,7 +94,7 @@ private fun Project.registerInteropBundleTasks() {
         task.from(createInteropBundleTask.flatMap { it.outputDirectory })
         task.destinationDirectory.set(buildDir)
         task.archiveBaseName.set("interopBundle")
-        task.archiveExtension.set("kib")
+        task.archiveExtension.set(ZIPPED_INTEROP_BUNDLE_FILE_EXTENSION)
     }
 
     tasks.register("clean", Delete::class.java) { task ->
@@ -98,13 +117,36 @@ private fun Project.registerArtifacts() {
     artifacts.add(INTEROP_BUNDLE_CONFIGURATION_NAME, createInteropBundleKibTask.flatMap { it.archiveFile }) { artifact ->
         artifact.builtBy(createInteropBundleKibTask)
         artifact.type = ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE
-        artifact.extension = "kib"
+        artifact.extension = ZIPPED_INTEROP_BUNDLE_FILE_EXTENSION
     }
 }
 
-private fun Project.registerSoftwareComponent() {
+private fun Project.setupPublication() {
+    plugins.withId("maven-publish") {
+        val softwareComponentFactoryClass = SoftwareComponentFactory::class.java
+        val softwareComponentFactory = (project as ProjectInternal).services.get(softwareComponentFactoryClass)
+        val component = softwareComponentFactory.adhoc("interopBundle").apply {
+            addVariantsFromConfiguration(interopBundleConfiguration) { details ->
+                println(details)
+            }
+        }
 
+        project.extensions.configure(PublishingExtension::class.java) { publishing ->
+            publishing.publications.register("interopBundle", MavenPublication::class.java) { publication ->
+                publication.from(component)
+                afterEvaluate {
+                    publication.groupId = interopBundleExtension.groupId.orNull
+                    publication.version = interopBundleExtension.version.orNull
+                    publication.artifactId = interopBundleExtension.artifactId.orNull
+                }
+            }
+        }
+    }
 }
 
 private val Project.createInteropBundleKibTask: TaskProvider<Zip>
     get() = tasks.withType(Zip::class.java).named(CREATE_INTEROP_BUNDLE_KIB_TASK_NAME)
+
+private val Project.interopBundleConfiguration get() = configurations.getByName(INTEROP_BUNDLE_CONFIGURATION_NAME)
+
+private val Project.interopBundleExtension get() = extensions.getByName(INTEROP_BUNDLE_EXTENSION_NAME) as InteropBundleExtension

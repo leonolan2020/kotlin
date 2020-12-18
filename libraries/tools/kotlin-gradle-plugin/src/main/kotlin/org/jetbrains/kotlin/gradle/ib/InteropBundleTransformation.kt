@@ -46,16 +46,9 @@ private fun Project.setupAttributeSchema() {
     val kotlin = multiplatformExtensionOrNull ?: return
     dependencies.attributesSchema.attribute(COMMONIZER_TARGET_ATTRIBUTE)
 
-    dependencies.artifactTypes.register(INTEROP_BUNDLE_ARTIFACT_TYPE) { definition ->
+    dependencies.artifactTypes.register(ZIPPED_INTEROP_BUNDLE_FILE_EXTENSION) { definition ->
+        definition.attributes.attribute(ARTIFACT_TYPE_ATTRIBUTE, ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE)
         definition.attributes.attribute(COMMONIZER_TARGET_ATTRIBUTE, INTEROP_BUNDLE_COMMONIZIER_TARGET)
-    }
-
-    dependencies.artifactTypes.register(ZIPPED_INTEROP_BUNDLE_ARTIFACT_TYPE) { definition ->
-        definition.attributes.attribute(COMMONIZER_TARGET_ATTRIBUTE, INTEROP_BUNDLE_COMMONIZIER_TARGET)
-    }
-
-    dependencies.artifactTypes.register(COMMONIZED_INTEROP_BUNDLE_ARTIFACT_TYPE) { definition ->
-        definition.attributes.attribute(COMMONIZER_TARGET_ATTRIBUTE, WILDCARD_COMMONIIZER_TARGET)
     }
 
     kotlin.targets.all { target ->
