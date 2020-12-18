@@ -9,7 +9,7 @@
       interface/class from Java
     </problem_class>
     <description>Java class cannot be a part of Kotlin sealed hierarchy</description>
-    <highlighted_element>private static class TryToImplement implements KotlinSealedInterface {}</highlighted_element>
+    <highlighted_element>KotlinSealedInterface</highlighted_element>
     <offset>4</offset>
     <length>71</length>
   </problem>
@@ -24,7 +24,7 @@
       interface/class from Java
     </problem_class>
     <description>Java interface cannot be a part of Kotlin sealed hierarchy</description>
-    <highlighted_element>private static interface TryToExtend extends KotlinSealedInterface {}</highlighted_element>
+    <highlighted_element>KotlinSealedInterface</highlighted_element>
     <offset>4</offset>
     <length>69</length>
   </problem>
@@ -39,7 +39,7 @@
       interface/class from Java
     </problem_class>
     <description>Java class cannot be a part of Kotlin sealed hierarchy</description>
-    <highlighted_element>private static class TryToExtendClass extends KotlinSealedClass {}</highlighted_element>
+    <highlighted_element>KotlinSealedClass</highlighted_element>
     <offset>4</offset>
     <length>66</length>
   </problem>
@@ -52,7 +52,7 @@
     <entry_point TYPE="class" FQNAME="JavaTriesToExtendKotlinSealed$1" />
     <problem_class id="KotlinSealedInheritorsInJava" severity="ERROR" attribute_key="ERRORS_ATTRIBUTES">Inheritance of Kotlin sealed interface/class from Java</problem_class>
     <description>Java class cannot be a part of Kotlin sealed hierarchy</description>
-    <highlighted_element>KotlinSealedInterface() {}</highlighted_element>
+    <highlighted_element>KotlinSealedInterface</highlighted_element>
     <offset>52</offset>
     <length>26</length>
   </problem>
@@ -65,7 +65,7 @@
     <entry_point TYPE="class" FQNAME="JavaTriesToExtendKotlinSealed$2" />
     <problem_class id="KotlinSealedInheritorsInJava" severity="ERROR" attribute_key="ERRORS_ATTRIBUTES">Inheritance of Kotlin sealed interface/class from Java</problem_class>
     <description>Java class cannot be a part of Kotlin sealed hierarchy</description>
-    <highlighted_element>KotlinSealedClass() {}</highlighted_element>
+    <highlighted_element>KotlinSealedClass()</highlighted_element>
     <offset>44</offset>
     <length>22</length>
   </problem>
